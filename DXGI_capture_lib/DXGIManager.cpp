@@ -195,16 +195,10 @@ HRESULT DXGIManager::get_output_rect(RECT& rc) {
 
 	DuplicatedOutput output = get_output_duplication();
 
-	RECT rcShare;
-	SetRect(&rcShare, 0, 0, 0, 0);
-
 	DXGI_OUTPUT_DESC outDesc;
 	output.get_desc(outDesc);
-	RECT rcOutCoords = outDesc.DesktopCoordinates;
 
-	UnionRect(&rcShare, &rcShare, &rcOutCoords);
-
-	CopyRect(&rc, &rcShare);
+	CopyRect(&rc, &outDesc.DesktopCoordinates);
 
 	return S_OK;
 }
@@ -306,25 +300,20 @@ vector<BYTE> DXGIManager::get_output_data() {
 }
 
 DuplicatedOutput DXGIManager::get_output_duplication() {
-	if (m_capture_source == 0) {
-		// Return the primary output
-		for (vector<DuplicatedOutput>::iterator iter = m_out_dups.begin();
-			iter != m_out_dups.end();
-			iter++) {
-			DuplicatedOutput& out = *iter;
-			if (out.is_primary()) {
-				return out;
+	auto out_it = m_out_dups.begin();
+	if (m_capture_source == 0) { // Find the primary output
+		for (; out_it != m_out_dups.end(); out_it++) {
+			if (out_it->is_primary()) {
+				break;
 			}
 		}
-	} else {
-		// Return the m_capture_source:th, non-primary output
-		auto out_it = m_out_dups.begin();
+	} else { // Find the m_capture_source:th, non-primary output
 		for (UINT32 i = 0; i < m_capture_source && out_it != m_out_dups.end(); i++) {
 			if (!out_it->is_primary()) {
 				i++;
 			}
 			out_it++;
 		}
-		return *out_it;
 	}
+	return *out_it;
 }
