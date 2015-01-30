@@ -25,11 +25,10 @@ enum CaptureSource
 class DuplicatedOutput
 {
 public:
-	DuplicatedOutput(IDXGIAdapter1* pAdapter,
-		ID3D11Device* pD3DDevice,
-		ID3D11DeviceContext* pD3DDeviceContext,
-		IDXGIOutput1* pDXGIOutput1,
-		IDXGIOutputDuplication* pDXGIOutputDuplication);
+	DuplicatedOutput(ID3D11Device* device,
+		ID3D11DeviceContext* context,
+		IDXGIOutput1* output,
+		IDXGIOutputDuplication* output_duplication);
 
 	HRESULT get_desc(DXGI_OUTPUT_DESC& desc);
 	HRESULT acquire_next_frame(IDXGISurface1** pD3D11Texture2D);
@@ -38,7 +37,7 @@ public:
 	bool is_primary();
 
 private:
-	CComPtr<IDXGIAdapter1> m_Adapter;
+	CComPtr<IDXGIAdapter1> m_adapter;
 	CComPtr<ID3D11Device> m_D3DDevice;
 	CComPtr<ID3D11DeviceContext> m_D3DDeviceContext;
 	CComPtr<IDXGIOutput1> m_DXGIOutput1;

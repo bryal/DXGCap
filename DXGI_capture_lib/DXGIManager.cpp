@@ -1,16 +1,14 @@
 #include "DXGIManager.hpp"
 
 
-DuplicatedOutput::DuplicatedOutput(IDXGIAdapter1* pAdapter,
-	ID3D11Device* pD3DDevice,
-	ID3D11DeviceContext* pD3DDeviceContext,
-	IDXGIOutput1* pDXGIOutput1,
-	IDXGIOutputDuplication* pDuplicatedOutput)
-	: m_Adapter(pAdapter),
-	m_D3DDevice(pD3DDevice),
-	m_D3DDeviceContext(pD3DDeviceContext),
-	m_DXGIOutput1(pDXGIOutput1),
-	m_DXGIOutputDuplication(pDuplicatedOutput)
+DuplicatedOutput::DuplicatedOutput(ID3D11Device* device,
+	ID3D11DeviceContext* context,
+	IDXGIOutput1* output,
+	IDXGIOutputDuplication* output_duplication):
+		m_D3DDevice(device),
+		m_D3DDeviceContext(context),
+		m_DXGIOutput1(output),
+		m_DXGIOutputDuplication(output_duplication)
 {
 }
 
@@ -194,11 +192,10 @@ HRESULT DXGIManager::Init()
 				continue;
 
 			m_vOutputs.push_back(
-				DuplicatedOutput((*AdapterIter),
-				spD3D11Device,
-				spD3D11DeviceContext,
-				spDXGIOutput1,
-				spDuplicatedOutput));
+				DuplicatedOutput(spD3D11Device,
+					spD3D11DeviceContext,
+					spDXGIOutput1,
+					spDuplicatedOutput));
 		}
 	}
 
