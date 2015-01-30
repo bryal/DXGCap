@@ -28,7 +28,7 @@ public:
 	DuplicatedOutput(ID3D11Device* device,
 		ID3D11DeviceContext* context,
 		IDXGIOutput1* output,
-		IDXGIOutputDuplication* output_duplication);
+		IDXGIOutputDuplication* output_dup);
 
 	HRESULT get_desc(DXGI_OUTPUT_DESC& desc);
 	HRESULT acquire_next_frame(IDXGISurface1** pD3D11Texture2D);
@@ -37,11 +37,10 @@ public:
 	bool is_primary();
 
 private:
-	CComPtr<IDXGIAdapter1> m_adapter;
-	CComPtr<ID3D11Device> m_D3DDevice;
-	CComPtr<ID3D11DeviceContext> m_D3DDeviceContext;
-	CComPtr<IDXGIOutput1> m_DXGIOutput1;
-	CComPtr<IDXGIOutputDuplication> m_DXGIOutputDuplication;
+	CComPtr<ID3D11Device> m_device;
+	CComPtr<ID3D11DeviceContext> m_device_context;
+	CComPtr<IDXGIOutput1> m_output;
+	CComPtr<IDXGIOutputDuplication> m_dxgi_output_dup;
 };
 
 class DXGIManager

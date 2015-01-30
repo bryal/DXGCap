@@ -4,17 +4,15 @@
 DuplicatedOutput::DuplicatedOutput(ID3D11Device* device,
 	ID3D11DeviceContext* context,
 	IDXGIOutput1* output,
-	IDXGIOutputDuplication* output_duplication):
-		m_D3DDevice(device),
-		m_D3DDeviceContext(context),
-		m_DXGIOutput1(output),
-		m_DXGIOutputDuplication(output_duplication)
-{
-}
+	IDXGIOutputDuplication* output_dup):
+		m_device(device),
+		m_device_context(context),
+		m_output(output),
+		m_dxgi_output_dup(output_dup) { }
 
 HRESULT DuplicatedOutput::get_desc(DXGI_OUTPUT_DESC& desc)
 {
-	m_DXGIOutput1->GetDesc(&desc);
+	m_output->GetDesc(&desc);
 	return S_OK;
 }
 
@@ -22,7 +20,7 @@ HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface)
 {
 	DXGI_OUTDUPL_FRAME_INFO fi;
 	CComPtr<IDXGIResource> spDXGIResource;
-	HRESULT hr = m_DXGIOutputDuplication->AcquireNextFrame(20, &fi, &spDXGIResource);
+	HRESULT hr = m_dxgi_output_dup->AcquireNextFrame(20, &fi, &spDXGIResource);
 	if (FAILED(hr))
 	{
 		printf("m_DXGIOutputDuplication->AcquireNextFrame failed with hr=0x%08x\n", hr);
@@ -49,11 +47,11 @@ HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface)
 	texDesc.MiscFlags = 0;
 
 	CComPtr<ID3D11Texture2D> spD3D11Texture2D = NULL;
-	hr = m_D3DDevice->CreateTexture2D(&texDesc, NULL, &spD3D11Texture2D);
+	hr = m_device->CreateTexture2D(&texDesc, NULL, &spD3D11Texture2D);
 	if (FAILED(hr))
 		return hr;
 
-	m_D3DDeviceContext->CopyResource(spD3D11Texture2D, spTextureResource);
+	m_device_context->CopyResource(spD3D11Texture2D, spTextureResource);
 
 	CComQIPtr<IDXGISurface1> spDXGISurface = spD3D11Texture2D;
 
@@ -64,14 +62,14 @@ HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface)
 
 HRESULT DuplicatedOutput::release_frame()
 {
-	m_DXGIOutputDuplication->ReleaseFrame();
+	m_dxgi_output_dup->ReleaseFrame();
 	return S_OK;
 }
 
 bool DuplicatedOutput::is_primary()
 {
 	DXGI_OUTPUT_DESC outdesc;
-	m_DXGIOutput1->GetDesc(&outdesc);
+	m_output->GetDesc(&outdesc);
 
 	MONITORINFO mi;
 	mi.cbSize = sizeof(MONITORINFO);
