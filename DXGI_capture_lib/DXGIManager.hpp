@@ -2,7 +2,6 @@
 
 #include <Windows.h>
 #include <atlbase.h>
-#include <DXGITYPE.h>
 #include <DXGI1_2.h>
 #include <d3d11.h>
 #include <Wincodec.h>
