@@ -14,7 +14,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	DXGIManager dxgi_manager;
 
-	dxgi_manager.set_capture_source(CSMonitor1);
+	dxgi_manager.set_capture_source(0);
 
 	RECT rcDim;
 	dxgi_manager.get_output_rect(rcDim);

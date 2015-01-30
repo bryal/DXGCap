@@ -14,13 +14,6 @@
 using std::vector;
 
 
-enum CaptureSource {
-	CSUndefined,
-	CSMonitor1,
-	CSMonitor2,
-	CSDesktop
-};
-
 class DuplicatedOutput {
 public:
 	DuplicatedOutput(ID3D11Device* device,
@@ -45,20 +38,20 @@ class DXGIManager {
 public:
 	DXGIManager();
 	~DXGIManager();
-	void set_capture_source(CaptureSource type);
-	CaptureSource get_capture_source();
+	void set_capture_source(UINT16 cs);
+	UINT16 get_capture_source();
 
 	HRESULT get_output_rect(RECT& rc);
 	HRESULT get_output_bits(BYTE* pBits, RECT& rcDest);
 private:
 	HRESULT init();
-	vector<DuplicatedOutput> get_output_duplication();
+	DuplicatedOutput get_output_duplication();
 private:
 	CComPtr<IDXGIFactory1> m_factory;
 	vector<DuplicatedOutput> m_outputs;
 	bool m_initialized;
-	CaptureSource m_capture_rect;
-	RECT m_current_output;
+	UINT16 m_capture_source;
+	RECT m_output_rect;
 	BYTE* m_buf;
 
 	CComPtr<IWICImagingFactory> m_spWICFactory;
