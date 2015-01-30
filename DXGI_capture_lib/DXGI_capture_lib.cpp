@@ -3,7 +3,7 @@
 
 #include "DXGIManager.hpp"
 
-DXGIManager g_DXGIManager;
+
 
 int _tmain(int argc, _TCHAR* argv[]) {
 	printf("DXGICaptureSample. Fast windows screen capture\n");
@@ -12,10 +12,12 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	CoInitialize(NULL);
 
-	g_DXGIManager.SetCaptureSource(CSMonitor1);
+	DXGIManager dxgi_manager;
+
+	dxgi_manager.SetCaptureSource(CSMonitor1);
 
 	RECT rcDim;
-	g_DXGIManager.GetOutputRect(rcDim);
+	dxgi_manager.GetOutputRect(rcDim);
 
 	DWORD dwWidth = rcDim.right - rcDim.left;
 	DWORD dwHeight = rcDim.bottom - rcDim.top;
@@ -34,7 +36,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	int i = 0;
 	do {
-		hr = g_DXGIManager.GetOutputBits(pBuf, rcDim);
+		hr = dxgi_manager.GetOutputBits(pBuf, rcDim);
 		i++;
 	} while (hr == DXGI_ERROR_WAIT_TIMEOUT || i < 2);
 

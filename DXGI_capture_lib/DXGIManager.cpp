@@ -10,9 +10,8 @@ DuplicatedOutput::DuplicatedOutput(ID3D11Device* device,
 		m_output(output),
 		m_dxgi_output_dup(output_dup) { }
 
-HRESULT DuplicatedOutput::get_desc(DXGI_OUTPUT_DESC& desc) {
+void DuplicatedOutput::get_desc(DXGI_OUTPUT_DESC& desc) {
 	m_output->GetDesc(&desc);
-	return S_OK;
 }
 
 HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface) {
@@ -58,9 +57,8 @@ HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface) {
 	return hr;
 }
 
-HRESULT DuplicatedOutput::release_frame() {
+void DuplicatedOutput::release_frame() {
 	m_dxgi_output_dup->ReleaseFrame();
-	return S_OK;
 }
 
 bool DuplicatedOutput::is_primary() {
@@ -90,9 +88,8 @@ DXGIManager::~DXGIManager() {
 	}
 }
 
-HRESULT DXGIManager::SetCaptureSource(CaptureSource cs) {
+void DXGIManager::SetCaptureSource(CaptureSource cs) {
 	m_CaptureSource = cs;
-	return S_OK;
 }
 
 CaptureSource DXGIManager::GetCaptureSource() {
@@ -430,18 +427,4 @@ vector<DuplicatedOutput> DXGIManager::GetOutputDuplication() {
 	break;
 	}
 	return outputs;
-}
-
-BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData) {
-	int *Count = (int*)dwData;
-	(*Count)++;
-	return TRUE;
-}
-
-int DXGIManager::GetMonitorCount() {
-	int Count = 0;
-	if (EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, (LPARAM)&Count)) {
-		return Count;
-	}
-	return -1;
 }

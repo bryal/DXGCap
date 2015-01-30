@@ -14,25 +14,23 @@
 using std::vector;
 
 
-enum CaptureSource
-{
+enum CaptureSource {
 	CSUndefined,
 	CSMonitor1,
 	CSMonitor2,
 	CSDesktop
 };
 
-class DuplicatedOutput
-{
+class DuplicatedOutput {
 public:
 	DuplicatedOutput(ID3D11Device* device,
 		ID3D11DeviceContext* context,
 		IDXGIOutput1* output,
 		IDXGIOutputDuplication* output_dup);
 
-	HRESULT get_desc(DXGI_OUTPUT_DESC& desc);
+	void get_desc(DXGI_OUTPUT_DESC& desc);
 	HRESULT acquire_next_frame(IDXGISurface1** pD3D11Texture2D);
-	HRESULT release_frame();
+	void release_frame();
 
 	bool is_primary();
 
@@ -43,12 +41,11 @@ private:
 	CComPtr<IDXGIOutputDuplication> m_dxgi_output_dup;
 };
 
-class DXGIManager
-{
+class DXGIManager {
 public:
 	DXGIManager();
 	~DXGIManager();
-	HRESULT SetCaptureSource(CaptureSource type);
+	void SetCaptureSource(CaptureSource type);
 	CaptureSource GetCaptureSource();
 
 	HRESULT GetOutputRect(RECT& rc);
