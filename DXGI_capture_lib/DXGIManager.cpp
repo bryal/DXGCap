@@ -74,11 +74,9 @@ bool DuplicatedOutput::is_primary() {
 	return false;
 }
 
-DXGIManager::DXGIManager() {
-	m_capture_source = 0;
+DXGIManager::DXGIManager(): m_capture_source(0), m_initialized(false) {
 	SetRect(&m_output_rect, 0, 0, 0, 0);
-	m_buf = NULL;
-	m_initialized = false;
+	init();
 }
 
 DXGIManager::~DXGIManager() {
@@ -95,16 +93,12 @@ UINT16 DXGIManager::get_capture_source() {
 	return m_capture_source;
 }
 
-HRESULT DXGIManager::init() {
+void DXGIManager::init() {
 	if (m_initialized) {
-		return S_OK;
+		return;
 	}
 
-	HRESULT hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&m_factory));
-	if (FAILED(hr)) {
-		printf("Failed to CreateDXGIFactory1 hr=%08x\n", hr);
-		return hr;
-	}
+	CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&m_factory));
 
 	// Getting all adapters
 	vector<CComPtr<IDXGIAdapter1>> vAdapters;
@@ -150,23 +144,23 @@ HRESULT DXGIManager::init() {
 		CComPtr<ID3D11Device> spD3D11Device;
 		CComPtr<ID3D11DeviceContext> spD3D11DeviceContext;
 		D3D_FEATURE_LEVEL fl = D3D_FEATURE_LEVEL_9_1;
-		hr = D3D11CreateDevice((*AdapterIter), D3D_DRIVER_TYPE_UNKNOWN, NULL, 0, NULL, 0, D3D11_SDK_VERSION, &spD3D11Device, &fl, &spD3D11DeviceContext);
-		if (FAILED(hr)) {
-			printf("Failed to create D3D11CreateDevice hr=%08x\n", hr);
-			return hr;
-		}
+		D3D11CreateDevice((*AdapterIter),
+			D3D_DRIVER_TYPE_UNKNOWN,
+			NULL, 0, NULL, 0,
+			D3D11_SDK_VERSION,
+			&spD3D11Device,
+			&fl,
+			&spD3D11DeviceContext);
 
-		for (std::vector<CComPtr<IDXGIOutput>>::iterator OutputIter = vOutputs.begin();
-			OutputIter != vOutputs.end();
-			OutputIter++) {
-			CComQIPtr<IDXGIOutput1> spDXGIOutput1 = *OutputIter;
+		for (auto out_it = vOutputs.begin(); out_it != vOutputs.end(); out_it++) {
+			CComQIPtr<IDXGIOutput1> spDXGIOutput1 = *out_it;
 			CComQIPtr<IDXGIDevice1> spDXGIDevice = spD3D11Device;
 			if (!spDXGIOutput1 || !spDXGIDevice) {
 				continue;
 			}
 
 			CComPtr<IDXGIOutputDuplication> spDuplicatedOutput;
-			hr = spDXGIOutput1->DuplicateOutput(spDXGIDevice, &spDuplicatedOutput);
+			HRESULT hr = spDXGIOutput1->DuplicateOutput(spDXGIDevice, &spDuplicatedOutput);
 			if (FAILED(hr)) {
 				continue;
 			}
@@ -181,18 +175,10 @@ HRESULT DXGIManager::init() {
 
 	m_initialized = true;
 
-	return S_OK;
+	return;
 }
 
 HRESULT DXGIManager::get_output_rect(RECT& rc) {
-	// Nulling rc just in case...
-	SetRect(&rc, 0, 0, 0, 0);
-
-	HRESULT hr = init();
-	if (hr != S_OK) {
-		return hr;
-	}
-
 	DuplicatedOutput output = get_output_duplication();
 
 	DXGI_OUTPUT_DESC outDesc;

@@ -63,20 +63,15 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	CComPtr<IWICBitmapFrameEncode> spFrame = NULL;
 	TRY(spEncoder->CreateNewFrame(&spFrame, NULL));
-
 	TRY(spFrame->Initialize(NULL));
-
 	TRY(spFrame->SetSize(dwWidth, dwHeight));
 
 	WICPixelFormatGUID format;
 	TRY(spBitmap->GetPixelFormat(&format));
-
 	TRY(hr = spFrame->SetPixelFormat(&format));
 	TRY(hr = spFrame->WriteSource(spBitmap, NULL));
 	TRY(hr = spFrame->Commit());
 	TRY(hr = spEncoder->Commit());
 
-
 	return 0;
 }
-
