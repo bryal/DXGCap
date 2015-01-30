@@ -215,16 +215,14 @@ HRESULT DXGIManager::get_output_rect(RECT& rc) {
 	return S_OK;
 }
 
-HRESULT DXGIManager::get_output_bits(BYTE* pBits, RECT& rcDest) {
-	HRESULT hr = S_OK;
-
+void DXGIManager::get_output_data(BYTE* pBits, RECT& rcDest) {
 	DWORD dwDestWidth = rcDest.right - rcDest.left;
 	DWORD dwDestHeight = rcDest.bottom - rcDest.top;
 
 	RECT rcOutput;
-	hr = get_output_rect(rcOutput);
+	HRESULT hr = get_output_rect(rcOutput);
 	if (FAILED(hr)) {
-		return hr;
+		throw hr;
 	}
 
 	DWORD dwOutputWidth = rcOutput.right - rcOutput.left;
@@ -264,7 +262,7 @@ HRESULT DXGIManager::get_output_bits(BYTE* pBits, RECT& rcDest) {
 	CComPtr<IDXGISurface1> spDXGISurface1;
 	hr = output.acquire_next_frame(&spDXGISurface1);
 	if (FAILED(hr)) {
-		return hr;
+		throw hr;
 	}
 
 	DXGI_MAPPED_RECT map;
@@ -328,7 +326,7 @@ HRESULT DXGIManager::get_output_bits(BYTE* pBits, RECT& rcDest) {
 
 
 	if (FAILED(hr)) {
-		return hr;
+		throw hr;
 	}
 
 
@@ -338,13 +336,13 @@ HRESULT DXGIManager::get_output_bits(BYTE* pBits, RECT& rcDest) {
 		CComPtr<IWICBitmap> spBitmap = NULL;
 		hr = m_spWICFactory->CreateBitmapFromMemory(dwOutputWidth, dwOutputHeight, GUID_WICPixelFormat32bppBGRA, dwOutputWidth * 4, dwOutputWidth*dwOutputHeight * 4, (BYTE*)pBuf, &spBitmap);
 		if (FAILED(hr)) {
-			return hr;
+			throw hr;
 		}
 
 		CComPtr<IWICBitmapScaler> spBitmapScaler = NULL;
 		hr = m_spWICFactory->CreateBitmapScaler(&spBitmapScaler);
 		if (FAILED(hr)) {
-			return hr;
+			throw hr;
 		}
 
 		dwOutputWidth = rcOutput.right - rcOutput.left;
@@ -369,7 +367,6 @@ HRESULT DXGIManager::get_output_bits(BYTE* pBits, RECT& rcDest) {
 
 		spBitmapScaler->CopyPixels(NULL, scaledWidth * 4, dwDestWidth*dwDestHeight * 4, pBits);
 	}
-	return hr;
 }
 
 DuplicatedOutput DXGIManager::get_output_duplication() {

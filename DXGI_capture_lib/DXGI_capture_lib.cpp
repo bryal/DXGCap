@@ -36,12 +36,16 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	int i = 0;
 	do {
-		hr = dxgi_manager.get_output_bits(pBuf, rcDim);
+		try {
+			dxgi_manager.get_output_data(pBuf, rcDim);
+		} catch (HRESULT e) {
+			hr = e;
+		}
 		i++;
 	} while (hr == DXGI_ERROR_WAIT_TIMEOUT || i < 2);
 
 	if (FAILED(hr)) {
-		printf("get_output_bits failed with hr=0x%08x\n", hr);
+		printf("get_output_data failed with hr=0x%08x\n", hr);
 		return hr;
 	}
 

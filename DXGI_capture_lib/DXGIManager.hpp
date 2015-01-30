@@ -42,7 +42,7 @@ public:
 	UINT16 get_capture_source();
 
 	HRESULT get_output_rect(RECT& rc);
-	HRESULT get_output_bits(BYTE* pBits, RECT& rcDest);
+	void get_output_data(BYTE* pBits, RECT& rcDest);
 private:
 	HRESULT init();
 	DuplicatedOutput get_output_duplication();
