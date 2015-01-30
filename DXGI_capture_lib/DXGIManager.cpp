@@ -179,12 +179,6 @@ HRESULT DXGIManager::init() {
 		}
 	}
 
-	hr = m_spWICFactory.CoCreateInstance(CLSID_WICImagingFactory);
-	if (FAILED(hr)) {
-		printf("Failed to create WICImagingFactory hr=%08x\n", hr);
-		return hr;
-	}
-
 	m_initialized = true;
 
 	return S_OK;

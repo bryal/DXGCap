@@ -64,6 +64,4 @@ private:
 	UINT16 m_capture_source;
 	RECT m_output_rect;
 	BYTE* m_buf;
-
-	CComPtr<IWICImagingFactory> m_spWICFactory;
 };
