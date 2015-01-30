@@ -50,58 +50,32 @@ int _tmain(int argc, _TCHAR* argv[]) {
 	printf("Saving capture to file\n");
 
 	CComPtr<IWICBitmap> spBitmap = NULL;
-	hr = spWICFactory->CreateBitmapFromMemory(dwWidth, dwHeight, GUID_WICPixelFormat32bppBGRA, dwWidth * 4, dwBufSize, (BYTE*)pBuf, &spBitmap);
-	if (FAILED(hr)) {
-		return hr;
-	}
+	TRY(spWICFactory->CreateBitmapFromMemory(dwWidth, dwHeight, GUID_WICPixelFormat32bppBGRA, dwWidth * 4, dwBufSize, (BYTE*)pBuf, &spBitmap));
 
 	CComPtr<IWICStream> spStream = NULL;
 
-	hr = spWICFactory->CreateStream(&spStream);
-	if (SUCCEEDED(hr)) {
-		hr = spStream->InitializeFromFilename(L"capture.bmp", GENERIC_WRITE);
-	}
+	TRY(spWICFactory->CreateStream(&spStream));
+	TRY(spStream->InitializeFromFilename(L"capture.bmp", GENERIC_WRITE));
 
 	CComPtr<IWICBitmapEncoder> spEncoder = NULL;
-	if (SUCCEEDED(hr)) {
-		hr = spWICFactory->CreateEncoder(GUID_ContainerFormatBmp, NULL, &spEncoder);
-	}
-
-	if (SUCCEEDED(hr)) {
-		hr = spEncoder->Initialize(spStream, WICBitmapEncoderNoCache);
-	}
+	TRY(spWICFactory->CreateEncoder(GUID_ContainerFormatBmp, NULL, &spEncoder));
+	TRY(spEncoder->Initialize(spStream, WICBitmapEncoderNoCache));
 
 	CComPtr<IWICBitmapFrameEncode> spFrame = NULL;
-	if (SUCCEEDED(hr)) {
-		hr = spEncoder->CreateNewFrame(&spFrame, NULL);
-	}
+	TRY(spEncoder->CreateNewFrame(&spFrame, NULL));
 
-	if (SUCCEEDED(hr)) {
-		hr = spFrame->Initialize(NULL);
-	}
+	TRY(spFrame->Initialize(NULL));
 
-	if (SUCCEEDED(hr)) {
-		hr = spFrame->SetSize(dwWidth, dwHeight);
-	}
+	TRY(spFrame->SetSize(dwWidth, dwHeight));
 
 	WICPixelFormatGUID format;
-	spBitmap->GetPixelFormat(&format);
+	TRY(spBitmap->GetPixelFormat(&format));
 
-	if (SUCCEEDED(hr)) {
-		hr = spFrame->SetPixelFormat(&format);
-	}
+	TRY(hr = spFrame->SetPixelFormat(&format));
+	TRY(hr = spFrame->WriteSource(spBitmap, NULL));
+	TRY(hr = spFrame->Commit());
+	TRY(hr = spEncoder->Commit());
 
-	if (SUCCEEDED(hr)) {
-		hr = spFrame->WriteSource(spBitmap, NULL);
-	}
-
-	if (SUCCEEDED(hr)) {
-		hr = spFrame->Commit();
-	}
-
-	if (SUCCEEDED(hr)) {
-		hr = spEncoder->Commit();
-	}
 
 	return 0;
 }

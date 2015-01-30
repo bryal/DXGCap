@@ -14,6 +14,14 @@
 // The default format of B8G8R8A8 gives a pixel-size of 4 bytes
 #define DEF_PIXEL_SIZE 4
 
+#define TRY(expr) { \
+	HRESULT e = expr; \
+	if (FAILED(e)) { \
+		printf(#expr " failed with error: %x\n", e); \
+		return e; \
+	} \
+}
+
 using std::vector;
 
 
