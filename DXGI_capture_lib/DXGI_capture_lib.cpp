@@ -28,8 +28,9 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	CComPtr<IWICImagingFactory> spWICFactory = NULL;
 	HRESULT hr = spWICFactory.CoCreateInstance(CLSID_WICImagingFactory);
-	if (FAILED(hr))
+	if (FAILED(hr)) {
 		return hr;
+	}
 
 	int i = 0;
 	do {
@@ -46,8 +47,9 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	CComPtr<IWICBitmap> spBitmap = NULL;
 	hr = spWICFactory->CreateBitmapFromMemory(dwWidth, dwHeight, GUID_WICPixelFormat32bppBGRA, dwWidth * 4, dwBufSize, (BYTE*)pBuf, &spBitmap);
-	if (FAILED(hr))
+	if (FAILED(hr)) {
 		return hr;
+	}
 
 	CComPtr<IWICStream> spStream = NULL;
 

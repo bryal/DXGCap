@@ -45,8 +45,9 @@ HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface) {
 
 	CComPtr<ID3D11Texture2D> spD3D11Texture2D = NULL;
 	hr = m_device->CreateTexture2D(&texDesc, NULL, &spD3D11Texture2D);
-	if (FAILED(hr))
+	if (FAILED(hr)) {
 		return hr;
+	}
 
 	m_device_context->CopyResource(spD3D11Texture2D, spTextureResource);
 
@@ -99,8 +100,9 @@ CaptureSource DXGIManager::GetCaptureSource() {
 }
 
 HRESULT DXGIManager::Init() {
-	if (m_bInitialized)
+	if (m_bInitialized) {
 		return S_OK;
+	}
 
 	HRESULT hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&m_spDXGIFactory1));
 	if (FAILED(hr)) {
@@ -144,8 +146,9 @@ HRESULT DXGIManager::Init() {
 			spDXGIOutput.Release();
 		}
 
-		if (vOutputs.size() == 0)
+		if (vOutputs.size() == 0) {
 			continue;
+		}
 
 		// Creating device for each adapter that has the output
 		CComPtr<ID3D11Device> spD3D11Device;
@@ -162,13 +165,15 @@ HRESULT DXGIManager::Init() {
 			OutputIter++) {
 			CComQIPtr<IDXGIOutput1> spDXGIOutput1 = *OutputIter;
 			CComQIPtr<IDXGIDevice1> spDXGIDevice = spD3D11Device;
-			if (!spDXGIOutput1 || !spDXGIDevice)
+			if (!spDXGIOutput1 || !spDXGIDevice) {
 				continue;
+			}
 
 			CComPtr<IDXGIOutputDuplication> spDuplicatedOutput;
 			hr = spDXGIOutput1->DuplicateOutput(spDXGIDevice, &spDuplicatedOutput);
-			if (FAILED(hr))
+			if (FAILED(hr)) {
 				continue;
+			}
 
 			m_vOutputs.push_back(
 				DuplicatedOutput(spD3D11Device,
@@ -194,8 +199,9 @@ HRESULT DXGIManager::GetOutputRect(RECT& rc) {
 	SetRect(&rc, 0, 0, 0, 0);
 
 	HRESULT hr = Init();
-	if (hr != S_OK)
+	if (hr != S_OK) {
 		return hr;
+	}
 
 	vector<DuplicatedOutput> vOutputs = GetOutputDuplication();
 
@@ -227,8 +233,9 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest) {
 
 	RECT rcOutput;
 	hr = GetOutputRect(rcOutput);
-	if (FAILED(hr))
+	if (FAILED(hr)) {
 		return hr;
+	}
 
 	DWORD dwOutputWidth = rcOutput.right - rcOutput.left;
 	DWORD dwOutputHeight = rcOutput.bottom - rcOutput.top;
@@ -271,8 +278,9 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest) {
 
 		CComPtr<IDXGISurface1> spDXGISurface1;
 		hr = out.acquire_next_frame(&spDXGISurface1);
-		if (FAILED(hr))
+		if (FAILED(hr)) {
 			break;
+		}
 
 		DXGI_MAPPED_RECT map;
 		spDXGISurface1->Map(&map, DXGI_MAP_READ);
@@ -334,8 +342,9 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest) {
 		out.release_frame();
 	}
 
-	if (FAILED(hr))
+	if (FAILED(hr)) {
 		return hr;
+	}
 
 
 	// We have the pBuf filled with current desktop/monitor image.
@@ -343,13 +352,15 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest) {
 		// pBuf contains the image that should be resized
 		CComPtr<IWICBitmap> spBitmap = NULL;
 		hr = m_spWICFactory->CreateBitmapFromMemory(dwOutputWidth, dwOutputHeight, GUID_WICPixelFormat32bppBGRA, dwOutputWidth * 4, dwOutputWidth*dwOutputHeight * 4, (BYTE*)pBuf, &spBitmap);
-		if (FAILED(hr))
+		if (FAILED(hr)) {
 			return hr;
+		}
 
 		CComPtr<IWICBitmapScaler> spBitmapScaler = NULL;
 		hr = m_spWICFactory->CreateBitmapScaler(&spBitmapScaler);
-		if (FAILED(hr))
+		if (FAILED(hr)) {
 			return hr;
+		}
 
 		dwOutputWidth = rcOutput.right - rcOutput.left;
 		dwOutputHeight = rcOutput.bottom - rcOutput.top;
@@ -429,7 +440,8 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
 
 int DXGIManager::GetMonitorCount() {
 	int Count = 0;
-	if (EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, (LPARAM)&Count))
+	if (EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, (LPARAM)&Count)) {
 		return Count;
+	}
 	return -1;
 }
