@@ -48,7 +48,7 @@ private:
 	DuplicatedOutput get_output_duplication();
 private:
 	CComPtr<IDXGIFactory1> m_factory;
-	vector<DuplicatedOutput> m_outputs;
+	vector<DuplicatedOutput> m_out_dups;
 	bool m_initialized;
 	UINT16 m_capture_source;
 	RECT m_output_rect;

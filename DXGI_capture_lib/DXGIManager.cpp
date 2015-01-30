@@ -171,7 +171,7 @@ HRESULT DXGIManager::init() {
 				continue;
 			}
 
-			m_outputs.push_back(
+			m_out_dups.push_back(
 				DuplicatedOutput(spD3D11Device,
 					spD3D11DeviceContext,
 					spDXGIOutput1,
@@ -374,9 +374,9 @@ HRESULT DXGIManager::get_output_bits(BYTE* pBits, RECT& rcDest) {
 
 DuplicatedOutput DXGIManager::get_output_duplication() {
 	if (m_capture_source == 0) {
-		// Return the one with is_primary
-		for (vector<DuplicatedOutput>::iterator iter = m_outputs.begin();
-			iter != m_outputs.end();
+		// Return the primary output
+		for (vector<DuplicatedOutput>::iterator iter = m_out_dups.begin();
+			iter != m_out_dups.end();
 			iter++) {
 			DuplicatedOutput& out = *iter;
 			if (out.is_primary()) {
@@ -384,14 +384,14 @@ DuplicatedOutput DXGIManager::get_output_duplication() {
 			}
 		}
 	} else {
-		// Return the first with !is_primary
-		for (vector<DuplicatedOutput>::iterator iter = m_outputs.begin();
-			iter != m_outputs.end();
-			iter++) {
-			DuplicatedOutput& out = *iter;
-			if (!out.is_primary()) {
-				return out;
+		// Return the m_capture_source:th, non-primary output
+		auto out_it = m_out_dups.begin();
+		for (UINT32 i = 0; i < m_capture_source && out_it != m_out_dups.end(); i++) {
+			if (!out_it->is_primary()) {
+				i++;
 			}
+			out_it++;
 		}
+		return *out_it;
 	}
 }
