@@ -1,43 +1,5 @@
 #include "DXGIManager.hpp"
-#include <gdiplus.h>
 
-using namespace Gdiplus;
-
-DXGIPointerInfo::DXGIPointerInfo(BYTE* pPointerShape, UINT uiPointerShapeBufSize, DXGI_OUTDUPL_FRAME_INFO fi, DXGI_OUTDUPL_POINTER_SHAPE_INFO psi)
-	: m_pPointerShape(pPointerShape),
-	m_uiPointerShapeBufSize(uiPointerShapeBufSize),
-	m_FI(fi),
-	m_PSI(psi)
-{
-}
-
-DXGIPointerInfo::~DXGIPointerInfo()
-{
-	if (m_pPointerShape)
-	{
-		delete[] m_pPointerShape;
-	}
-}
-
-BYTE* DXGIPointerInfo::GetBuffer()
-{
-	return m_pPointerShape;
-}
-
-UINT DXGIPointerInfo::GetBufferSize()
-{
-	return m_uiPointerShapeBufSize;
-}
-
-DXGI_OUTDUPL_FRAME_INFO& DXGIPointerInfo::GetFrameInfo()
-{
-	return m_FI;
-}
-
-DXGI_OUTDUPL_POINTER_SHAPE_INFO& DXGIPointerInfo::GetShapeInfo()
-{
-	return m_PSI;
-}
 
 DXGIOutputDuplication::DXGIOutputDuplication(IDXGIAdapter1* pAdapter,
 	ID3D11Device* pD3DDevice,
@@ -58,7 +20,7 @@ HRESULT DXGIOutputDuplication::GetDesc(DXGI_OUTPUT_DESC& desc)
 	return S_OK;
 }
 
-HRESULT DXGIOutputDuplication::AcquireNextFrame(IDXGISurface1** pDXGISurface, DXGIPointerInfo*& pDXGIPointer)
+HRESULT DXGIOutputDuplication::AcquireNextFrame(IDXGISurface1** pDXGISurface)
 {
 	DXGI_OUTDUPL_FRAME_INFO fi;
 	CComPtr<IDXGIResource> spDXGIResource;
@@ -99,57 +61,6 @@ HRESULT DXGIOutputDuplication::AcquireNextFrame(IDXGISurface1** pDXGISurface, DX
 
 	*pDXGISurface = spDXGISurface.Detach();
 
-	// Updating mouse pointer, if visible
-	if (fi.PointerPosition.Visible)
-	{
-		BYTE* pPointerShape = new BYTE[fi.PointerShapeBufferSize];
-
-		DXGI_OUTDUPL_POINTER_SHAPE_INFO psi = {};
-		UINT uiPointerShapeBufSize = fi.PointerShapeBufferSize;
-		hr = m_DXGIOutputDuplication->GetFramePointerShape(uiPointerShapeBufSize, pPointerShape, &uiPointerShapeBufSize, &psi);
-		if (hr == DXGI_ERROR_MORE_DATA)
-		{
-			pPointerShape = new BYTE[uiPointerShapeBufSize];
-
-			hr = m_DXGIOutputDuplication->GetFramePointerShape(uiPointerShapeBufSize, pPointerShape, &uiPointerShapeBufSize, &psi);
-		}
-
-		if (hr == S_OK)
-		{
-			printf("PointerPosition Visible=%d x=%d y=%d w=%d h=%d type=%d\n", fi.PointerPosition.Visible, fi.PointerPosition.Position.x, fi.PointerPosition.Position.y, psi.Width, psi.Height, psi.Type);
-
-			if ((psi.Type == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MONOCHROME ||
-				psi.Type == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_COLOR ||
-				psi.Type == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MASKED_COLOR) &&
-				psi.Width <= 128 && psi.Height <= 128)
-			{
-				// Here we can obtain pointer shape
-				if (pDXGIPointer)
-				{
-					delete pDXGIPointer;
-				}
-
-				pDXGIPointer = new DXGIPointerInfo(pPointerShape, uiPointerShapeBufSize, fi, psi);
-
-				pPointerShape = NULL;
-			}
-
-			DXGI_OUTPUT_DESC outDesc;
-			GetDesc(outDesc);
-
-			if (pDXGIPointer)
-			{
-				pDXGIPointer->GetFrameInfo().PointerPosition.Position.x = outDesc.DesktopCoordinates.left + fi.PointerPosition.Position.x;
-				pDXGIPointer->GetFrameInfo().PointerPosition.Position.y = outDesc.DesktopCoordinates.top + fi.PointerPosition.Position.y;
-			}
-		}
-
-		if (pPointerShape)
-		{
-			delete[] pPointerShape;
-		}
-	}
-
 	return hr;
 }
 
@@ -179,24 +90,15 @@ DXGIManager::DXGIManager()
 	m_CaptureSource = CSUndefined;
 	SetRect(&m_rcCurrentOutput, 0, 0, 0, 0);
 	m_pBuf = NULL;
-	m_pDXGIPointer = NULL;
 	m_bInitialized = false;
 }
 
 DXGIManager::~DXGIManager()
 {
-	GdiplusShutdown(m_gdiplusToken);
-
 	if (m_pBuf)
 	{
 		delete[] m_pBuf;
 		m_pBuf = NULL;
-	}
-
-	if (m_pDXGIPointer)
-	{
-		delete m_pDXGIPointer;
-		m_pDXGIPointer = NULL;
 	}
 }
 
@@ -215,9 +117,6 @@ HRESULT DXGIManager::Init()
 {
 	if (m_bInitialized)
 		return S_OK;
-
-	GdiplusStartupInput gdiplusStartupInput;
-	GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, NULL);
 
 	HRESULT hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&m_spDXGIFactory1));
 	if (FAILED(hr))
@@ -404,7 +303,7 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 		RECT rcOutCoords = outDesc.DesktopCoordinates;
 
 		CComPtr<IDXGISurface1> spDXGISurface1;
-		hr = out.AcquireNextFrame(&spDXGISurface1, m_pDXGIPointer);
+		hr = out.AcquireNextFrame(&spDXGISurface1);
 		if (FAILED(hr))
 			break;
 
@@ -483,15 +382,6 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 	if (FAILED(hr))
 		return hr;
 
-	// Now pBits have the desktop. Let's paint mouse pointer!
-	if (pBuf != pBits)
-	{
-		DrawMousePointer(pBuf, rcOutput, rcOutput);
-	}
-	else
-	{
-		DrawMousePointer(pBuf, rcOutput, rcDest);
-	}
 
 	// We have the pBuf filled with current desktop/monitor image.
 	if (pBuf != pBits)
@@ -532,105 +422,6 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 		spBitmapScaler->CopyPixels(NULL, scaledWidth * 4, dwDestWidth*dwDestHeight * 4, pBits);
 	}
 	return hr;
-}
-
-void DXGIManager::DrawMousePointer(BYTE* pDesktopBits, RECT rcDesktop, RECT rcDest)
-{
-	if (!m_pDXGIPointer)
-		return;
-
-	DWORD dwDesktopWidth = rcDesktop.right - rcDesktop.left;
-	DWORD dwDesktopHeight = rcDesktop.bottom - rcDesktop.top;
-
-	DWORD dwDestWidth = rcDest.right - rcDest.left;
-	DWORD dwDestHeight = rcDest.bottom - rcDest.top;
-
-	int PtrX = m_pDXGIPointer->GetFrameInfo().PointerPosition.Position.x - rcDesktop.left;
-	int PtrY = m_pDXGIPointer->GetFrameInfo().PointerPosition.Position.y - rcDesktop.top;
-	switch (m_pDXGIPointer->GetShapeInfo().Type)
-	{
-	case DXGI_OUTDUPL_POINTER_SHAPE_TYPE_COLOR:
-	{
-		unique_ptr<Bitmap> bmpBitmap(new Bitmap(dwDestWidth, dwDestHeight, dwDestWidth * 4, PixelFormat32bppARGB, pDesktopBits));
-		unique_ptr<Graphics> graphics(Graphics::FromImage(bmpBitmap.get()));
-		unique_ptr<Bitmap> bmpPointer(new Bitmap(m_pDXGIPointer->GetShapeInfo().Width, m_pDXGIPointer->GetShapeInfo().Height, m_pDXGIPointer->GetShapeInfo().Width * 4, PixelFormat32bppARGB, m_pDXGIPointer->GetBuffer()));
-
-		graphics->DrawImage(bmpPointer.get(), PtrX, PtrY);
-	}
-	break;
-	case DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MONOCHROME:
-	case DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MASKED_COLOR:
-	{
-		RECT rcPointer;
-
-		if (m_pDXGIPointer->GetShapeInfo().Type == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MONOCHROME)
-		{
-			SetRect(&rcPointer, PtrX, PtrY, PtrX + m_pDXGIPointer->GetShapeInfo().Width, PtrY + m_pDXGIPointer->GetShapeInfo().Height / 2);
-		}
-		else
-		{
-			SetRect(&rcPointer, PtrX, PtrY, PtrX + m_pDXGIPointer->GetShapeInfo().Width, PtrY + m_pDXGIPointer->GetShapeInfo().Height);
-		}
-
-		RECT rcDesktopPointer;
-		IntersectRect(&rcDesktopPointer, &rcPointer, &rcDesktop);
-
-		CopyRect(&rcPointer, &rcDesktopPointer);
-		OffsetRect(&rcPointer, -PtrX, -PtrY);
-
-		BYTE* pShapeBuffer = m_pDXGIPointer->GetBuffer();
-		UINT* pDesktopBits32 = (UINT*)pDesktopBits;
-
-		if (m_pDXGIPointer->GetShapeInfo().Type == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MONOCHROME)
-		{
-			for (int j = rcPointer.top, jDP = rcDesktopPointer.top;
-				j<rcPointer.bottom && jDP<rcDesktopPointer.bottom;
-				j++, jDP++)
-			{
-				for (int i = rcPointer.left, iDP = rcDesktopPointer.left;
-					i<rcPointer.right && iDP<rcDesktopPointer.right;
-					i++, iDP++)
-				{
-					BYTE Mask = 0x80 >> (i % 8);
-					BYTE AndMask = pShapeBuffer[i / 8 + (m_pDXGIPointer->GetShapeInfo().Pitch)*j] & Mask;
-					BYTE XorMask = pShapeBuffer[i / 8 + (m_pDXGIPointer->GetShapeInfo().Pitch)*(j + m_pDXGIPointer->GetShapeInfo().Height / 2)] & Mask;
-
-					UINT AndMask32 = (AndMask) ? 0xFFFFFFFF : 0xFF000000;
-					UINT XorMask32 = (XorMask) ? 0x00FFFFFF : 0x00000000;
-
-					pDesktopBits32[jDP*dwDestWidth + iDP] = (pDesktopBits32[jDP*dwDestWidth + iDP] & AndMask32) ^ XorMask32;
-				}
-			}
-		}
-		else
-		{
-			UINT* pShapeBuffer32 = (UINT*)pShapeBuffer;
-			for (int j = rcPointer.top, jDP = rcDesktopPointer.top;
-				j<rcPointer.bottom && jDP<rcDesktopPointer.bottom;
-				j++, jDP++)
-			{
-				for (int i = rcPointer.left, iDP = rcDesktopPointer.left;
-					i<rcPointer.right && iDP<rcDesktopPointer.right;
-					i++, iDP++)
-				{
-					// Set up mask
-					UINT MaskVal = 0xFF000000 & pShapeBuffer32[i + (m_pDXGIPointer->GetShapeInfo().Pitch / 4)*j];
-					if (MaskVal)
-					{
-						// Mask was 0xFF
-						pDesktopBits32[jDP*dwDestWidth + iDP] = (pDesktopBits32[jDP*dwDestWidth + iDP] ^ pShapeBuffer32[i + (m_pDXGIPointer->GetShapeInfo().Pitch / 4)*j]) | 0xFF000000;
-					}
-					else
-					{
-						// Mask was 0x00 - replacing pixel
-						pDesktopBits32[jDP*dwDestWidth + iDP] = pShapeBuffer32[i + (m_pDXGIPointer->GetShapeInfo().Pitch / 4)*j];
-					}
-				}
-			}
-		}
-	}
-	break;
-	}
 }
 
 vector<DXGIOutputDuplication> DXGIManager::GetOutputDuplication()

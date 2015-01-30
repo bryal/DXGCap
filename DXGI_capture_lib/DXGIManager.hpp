@@ -11,12 +11,9 @@
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d11.lib")
-#pragma comment (lib, "gdiplus.lib")
-
 
 using namespace std;
 
-class DXGIPointerInfo;
 
 enum CaptureSource
 {
@@ -24,23 +21,6 @@ enum CaptureSource
 	CSMonitor1,
 	CSMonitor2,
 	CSDesktop
-};
-
-class DXGIPointerInfo
-{
-public:
-	DXGIPointerInfo(BYTE* pPointerShape, UINT uiPointerShapeBufSize, DXGI_OUTDUPL_FRAME_INFO fi, DXGI_OUTDUPL_POINTER_SHAPE_INFO psi);
-	~DXGIPointerInfo();
-	BYTE* GetBuffer();
-	UINT GetBufferSize();
-	DXGI_OUTDUPL_FRAME_INFO& GetFrameInfo();
-	DXGI_OUTDUPL_POINTER_SHAPE_INFO& GetShapeInfo();
-
-private:
-	BYTE* m_pPointerShape;
-	UINT m_uiPointerShapeBufSize;
-	DXGI_OUTDUPL_POINTER_SHAPE_INFO m_PSI;
-	DXGI_OUTDUPL_FRAME_INFO m_FI;
 };
 
 class DXGIOutputDuplication
@@ -53,7 +33,7 @@ public:
 		IDXGIOutputDuplication* pDXGIOutputDuplication);
 
 	HRESULT GetDesc(DXGI_OUTPUT_DESC& desc);
-	HRESULT AcquireNextFrame(IDXGISurface1** pD3D11Texture2D, DXGIPointerInfo*& pDXGIPointer);
+	HRESULT AcquireNextFrame(IDXGISurface1** pD3D11Texture2D);
 	HRESULT ReleaseFrame();
 
 	bool IsPrimary();
@@ -80,7 +60,6 @@ private:
 	HRESULT Init();
 	int GetMonitorCount();
 	vector<DXGIOutputDuplication> GetOutputDuplication();
-	void DrawMousePointer(BYTE* pDesktopBits, RECT rcDesktop, RECT rcDest);
 private:
 	CComPtr<IDXGIFactory1> m_spDXGIFactory1;
 	vector<DXGIOutputDuplication> m_vOutputs;
@@ -90,6 +69,4 @@ private:
 	BYTE* m_pBuf;
 
 	CComPtr<IWICImagingFactory> m_spWICFactory;
-	ULONG_PTR m_gdiplusToken;
-	DXGIPointerInfo* m_pDXGIPointer;
 };
