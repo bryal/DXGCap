@@ -1,26 +1,26 @@
 #include "DXGIManager.hpp"
 
 
-DXGIOutputDuplication::DXGIOutputDuplication(IDXGIAdapter1* pAdapter,
+DuplicatedOutput::DuplicatedOutput(IDXGIAdapter1* pAdapter,
 	ID3D11Device* pD3DDevice,
 	ID3D11DeviceContext* pD3DDeviceContext,
 	IDXGIOutput1* pDXGIOutput1,
-	IDXGIOutputDuplication* pDXGIOutputDuplication)
+	IDXGIOutputDuplication* pDuplicatedOutput)
 	: m_Adapter(pAdapter),
 	m_D3DDevice(pD3DDevice),
 	m_D3DDeviceContext(pD3DDeviceContext),
 	m_DXGIOutput1(pDXGIOutput1),
-	m_DXGIOutputDuplication(pDXGIOutputDuplication)
+	m_DXGIOutputDuplication(pDuplicatedOutput)
 {
 }
 
-HRESULT DXGIOutputDuplication::GetDesc(DXGI_OUTPUT_DESC& desc)
+HRESULT DuplicatedOutput::get_desc(DXGI_OUTPUT_DESC& desc)
 {
 	m_DXGIOutput1->GetDesc(&desc);
 	return S_OK;
 }
 
-HRESULT DXGIOutputDuplication::AcquireNextFrame(IDXGISurface1** pDXGISurface)
+HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface)
 {
 	DXGI_OUTDUPL_FRAME_INFO fi;
 	CComPtr<IDXGIResource> spDXGIResource;
@@ -64,13 +64,13 @@ HRESULT DXGIOutputDuplication::AcquireNextFrame(IDXGISurface1** pDXGISurface)
 	return hr;
 }
 
-HRESULT DXGIOutputDuplication::ReleaseFrame()
+HRESULT DuplicatedOutput::release_frame()
 {
 	m_DXGIOutputDuplication->ReleaseFrame();
 	return S_OK;
 }
 
-bool DXGIOutputDuplication::IsPrimary()
+bool DuplicatedOutput::is_primary()
 {
 	DXGI_OUTPUT_DESC outdesc;
 	m_DXGIOutput1->GetDesc(&outdesc);
@@ -188,17 +188,17 @@ HRESULT DXGIManager::Init()
 			if (!spDXGIOutput1 || !spDXGIDevice)
 				continue;
 
-			CComPtr<IDXGIOutputDuplication> spDXGIOutputDuplication;
-			hr = spDXGIOutput1->DuplicateOutput(spDXGIDevice, &spDXGIOutputDuplication);
+			CComPtr<IDXGIOutputDuplication> spDuplicatedOutput;
+			hr = spDXGIOutput1->DuplicateOutput(spDXGIDevice, &spDuplicatedOutput);
 			if (FAILED(hr))
 				continue;
 
 			m_vOutputs.push_back(
-				DXGIOutputDuplication((*AdapterIter),
+				DuplicatedOutput((*AdapterIter),
 				spD3D11Device,
 				spD3D11DeviceContext,
 				spDXGIOutput1,
-				spDXGIOutputDuplication));
+				spDuplicatedOutput));
 		}
 	}
 
@@ -223,19 +223,19 @@ HRESULT DXGIManager::GetOutputRect(RECT& rc)
 	if (hr != S_OK)
 		return hr;
 
-	vector<DXGIOutputDuplication> vOutputs = GetOutputDuplication();
+	vector<DuplicatedOutput> vOutputs = GetOutputDuplication();
 
 	RECT rcShare;
 	SetRect(&rcShare, 0, 0, 0, 0);
 
-	for (vector<DXGIOutputDuplication>::iterator iter = vOutputs.begin();
+	for (vector<DuplicatedOutput>::iterator iter = vOutputs.begin();
 		iter != vOutputs.end();
 		iter++)
 	{
-		DXGIOutputDuplication& out = *iter;
+		DuplicatedOutput& out = *iter;
 
 		DXGI_OUTPUT_DESC outDesc;
-		out.GetDesc(outDesc);
+		out.get_desc(outDesc);
 		RECT rcOutCoords = outDesc.DesktopCoordinates;
 
 		UnionRect(&rcShare, &rcShare, &rcOutCoords);
@@ -290,20 +290,20 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 		dwOutputHeight = dwDestHeight;
 	}
 
-	vector<DXGIOutputDuplication> vOutputs = GetOutputDuplication();
+	vector<DuplicatedOutput> vOutputs = GetOutputDuplication();
 
-	for (vector<DXGIOutputDuplication>::iterator iter = vOutputs.begin();
+	for (vector<DuplicatedOutput>::iterator iter = vOutputs.begin();
 		iter != vOutputs.end();
 		iter++)
 	{
-		DXGIOutputDuplication& out = *iter;
+		DuplicatedOutput& out = *iter;
 
 		DXGI_OUTPUT_DESC outDesc;
-		out.GetDesc(outDesc);
+		out.get_desc(outDesc);
 		RECT rcOutCoords = outDesc.DesktopCoordinates;
 
 		CComPtr<IDXGISurface1> spDXGISurface1;
-		hr = out.AcquireNextFrame(&spDXGISurface1);
+		hr = out.acquire_next_frame(&spDXGISurface1);
 		if (FAILED(hr))
 			break;
 
@@ -376,7 +376,7 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 
 		spDXGISurface1->Unmap();
 
-		out.ReleaseFrame();
+		out.release_frame();
 	}
 
 	if (FAILED(hr))
@@ -424,20 +424,20 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 	return hr;
 }
 
-vector<DXGIOutputDuplication> DXGIManager::GetOutputDuplication()
+vector<DuplicatedOutput> DXGIManager::GetOutputDuplication()
 {
-	vector<DXGIOutputDuplication> outputs;
+	vector<DuplicatedOutput> outputs;
 	switch (m_CaptureSource)
 	{
 	case CSMonitor1:
 	{
-		// Return the one with IsPrimary
-		for (vector<DXGIOutputDuplication>::iterator iter = m_vOutputs.begin();
+		// Return the one with is_primary
+		for (vector<DuplicatedOutput>::iterator iter = m_vOutputs.begin();
 			iter != m_vOutputs.end();
 			iter++)
 		{
-			DXGIOutputDuplication& out = *iter;
-			if (out.IsPrimary())
+			DuplicatedOutput& out = *iter;
+			if (out.is_primary())
 			{
 				outputs.push_back(out);
 				break;
@@ -448,13 +448,13 @@ vector<DXGIOutputDuplication> DXGIManager::GetOutputDuplication()
 
 	case CSMonitor2:
 	{
-		// Return the first with !IsPrimary
-		for (vector<DXGIOutputDuplication>::iterator iter = m_vOutputs.begin();
+		// Return the first with !is_primary
+		for (vector<DuplicatedOutput>::iterator iter = m_vOutputs.begin();
 			iter != m_vOutputs.end();
 			iter++)
 		{
-			DXGIOutputDuplication& out = *iter;
-			if (!out.IsPrimary())
+			DuplicatedOutput& out = *iter;
+			if (!out.is_primary())
 			{
 				outputs.push_back(out);
 				break;
@@ -466,11 +466,11 @@ vector<DXGIOutputDuplication> DXGIManager::GetOutputDuplication()
 	case CSDesktop:
 	{
 		// Return all outputs
-		for (vector<DXGIOutputDuplication>::iterator iter = m_vOutputs.begin();
+		for (vector<DuplicatedOutput>::iterator iter = m_vOutputs.begin();
 			iter != m_vOutputs.end();
 			iter++)
 		{
-			DXGIOutputDuplication& out = *iter;
+			DuplicatedOutput& out = *iter;
 			outputs.push_back(out);
 		}
 	}

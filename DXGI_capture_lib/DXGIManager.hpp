@@ -11,7 +11,7 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d11.lib")
 
-using namespace std;
+using std::vector;
 
 
 enum CaptureSource
@@ -22,20 +22,20 @@ enum CaptureSource
 	CSDesktop
 };
 
-class DXGIOutputDuplication
+class DuplicatedOutput
 {
 public:
-	DXGIOutputDuplication(IDXGIAdapter1* pAdapter,
+	DuplicatedOutput(IDXGIAdapter1* pAdapter,
 		ID3D11Device* pD3DDevice,
 		ID3D11DeviceContext* pD3DDeviceContext,
 		IDXGIOutput1* pDXGIOutput1,
 		IDXGIOutputDuplication* pDXGIOutputDuplication);
 
-	HRESULT GetDesc(DXGI_OUTPUT_DESC& desc);
-	HRESULT AcquireNextFrame(IDXGISurface1** pD3D11Texture2D);
-	HRESULT ReleaseFrame();
+	HRESULT get_desc(DXGI_OUTPUT_DESC& desc);
+	HRESULT acquire_next_frame(IDXGISurface1** pD3D11Texture2D);
+	HRESULT release_frame();
 
-	bool IsPrimary();
+	bool is_primary();
 
 private:
 	CComPtr<IDXGIAdapter1> m_Adapter;
@@ -58,10 +58,10 @@ public:
 private:
 	HRESULT Init();
 	int GetMonitorCount();
-	vector<DXGIOutputDuplication> GetOutputDuplication();
+	vector<DuplicatedOutput> GetOutputDuplication();
 private:
 	CComPtr<IDXGIFactory1> m_spDXGIFactory1;
-	vector<DXGIOutputDuplication> m_vOutputs;
+	vector<DuplicatedOutput> m_vOutputs;
 	bool m_bInitialized;
 	CaptureSource m_CaptureSource;
 	RECT m_rcCurrentOutput;
