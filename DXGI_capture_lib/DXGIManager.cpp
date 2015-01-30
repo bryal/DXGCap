@@ -215,43 +215,21 @@ HRESULT DXGIManager::get_output_rect(RECT& rc) {
 	return S_OK;
 }
 
-void DXGIManager::get_output_data(BYTE* pBits, RECT& rcDest) {
-	DWORD dwDestWidth = rcDest.right - rcDest.left;
-	DWORD dwDestHeight = rcDest.bottom - rcDest.top;
-
-	RECT rcOutput;
-	HRESULT hr = get_output_rect(rcOutput);
+vector<BYTE> DXGIManager::get_output_data() {
+	RECT output_rect;
+	HRESULT hr = get_output_rect(output_rect);
 	if (FAILED(hr)) {
 		throw hr;
 	}
 
-	DWORD dwOutputWidth = rcOutput.right - rcOutput.left;
-	DWORD dwOutputHeight = rcOutput.bottom - rcOutput.top;
+	DWORD dwOutputWidth = output_rect.right - output_rect.left;
+	DWORD dwOutputHeight = output_rect.bottom - output_rect.top;
 
-	BYTE* pBuf = NULL;
-	if (rcOutput.right > (LONG)dwDestWidth || rcOutput.bottom > (LONG)dwDestHeight) {
-		// Output is larger than pBits dimensions
-		if (!m_buf || !EqualRect(&m_output_rect, &rcOutput)) {
-			DWORD dwBufSize = dwOutputWidth*dwOutputHeight * 4;
+	DWORD buf_size = dwOutputWidth*dwOutputHeight * DEF_PIXEL_SIZE;
+	vector<BYTE> out_buf;
+	out_buf.reserve(buf_size);
 
-			if (m_buf) {
-				delete[] m_buf;
-				m_buf = NULL;
-			}
-
-			m_buf = new BYTE[dwBufSize];
-
-			CopyRect(&m_output_rect, &rcOutput);
-		}
-
-		pBuf = m_buf;
-	}
-	else {
-		// Output is smaller than pBits dimensions
-		pBuf = pBits;
-		dwOutputWidth = dwDestWidth;
-		dwOutputHeight = dwDestHeight;
-	}
+	BYTE* pBuf = out_buf.data();
 
 	DuplicatedOutput output = get_output_duplication();
 
@@ -272,7 +250,7 @@ void DXGIManager::get_output_data(BYTE* pBits, RECT& rcDest) {
 	DWORD dwWidth = rcDesktop.right - rcDesktop.left;
 	DWORD dwHeight = rcDesktop.bottom - rcDesktop.top;
 
-	OffsetRect(&rcDesktop, -rcOutput.left, -rcOutput.top);
+	OffsetRect(&rcDesktop, -output_rect.left, -output_rect.top);
 
 	DWORD dwMapPitchPixels = map.Pitch / 4;
 
@@ -329,44 +307,8 @@ void DXGIManager::get_output_data(BYTE* pBits, RECT& rcDest) {
 		throw hr;
 	}
 
-
 	// We have the pBuf filled with current desktop/monitor image.
-	if (pBuf != pBits) {
-		// pBuf contains the image that should be resized
-		CComPtr<IWICBitmap> spBitmap = NULL;
-		hr = m_spWICFactory->CreateBitmapFromMemory(dwOutputWidth, dwOutputHeight, GUID_WICPixelFormat32bppBGRA, dwOutputWidth * 4, dwOutputWidth*dwOutputHeight * 4, (BYTE*)pBuf, &spBitmap);
-		if (FAILED(hr)) {
-			throw hr;
-		}
-
-		CComPtr<IWICBitmapScaler> spBitmapScaler = NULL;
-		hr = m_spWICFactory->CreateBitmapScaler(&spBitmapScaler);
-		if (FAILED(hr)) {
-			throw hr;
-		}
-
-		dwOutputWidth = rcOutput.right - rcOutput.left;
-		dwOutputHeight = rcOutput.bottom - rcOutput.top;
-
-		double aspect = (double)dwOutputWidth / (double)dwOutputHeight;
-
-		DWORD scaledWidth = dwDestWidth;
-		DWORD scaledHeight = dwDestHeight;
-
-		if (aspect > 1) {
-			scaledWidth = dwDestWidth;
-			scaledHeight = (DWORD)(dwDestWidth / aspect);
-		}
-		else {
-			scaledWidth = (DWORD)(aspect*dwDestHeight);
-			scaledHeight = dwDestHeight;
-		}
-
-		spBitmapScaler->Initialize(
-			spBitmap, scaledWidth, scaledHeight, WICBitmapInterpolationModeNearestNeighbor);
-
-		spBitmapScaler->CopyPixels(NULL, scaledWidth * 4, dwDestWidth*dwDestHeight * 4, pBits);
-	}
+	return out_buf;
 }
 
 DuplicatedOutput DXGIManager::get_output_duplication() {

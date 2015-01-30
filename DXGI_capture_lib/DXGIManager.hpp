@@ -11,6 +11,9 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d11.lib")
 
+// The default format of B8G8R8A8 gives a pixel-size of 4 bytes
+#define DEF_PIXEL_SIZE 4
+
 using std::vector;
 
 
@@ -42,7 +45,7 @@ public:
 	UINT16 get_capture_source();
 
 	HRESULT get_output_rect(RECT& rc);
-	void get_output_data(BYTE* pBits, RECT& rcDest);
+	vector<BYTE> get_output_data();
 private:
 	HRESULT init();
 	DuplicatedOutput get_output_duplication();

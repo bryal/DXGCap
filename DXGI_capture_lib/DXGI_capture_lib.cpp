@@ -18,15 +18,11 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	RECT rcDim;
 	dxgi_manager.get_output_rect(rcDim);
-
 	DWORD dwWidth = rcDim.right - rcDim.left;
 	DWORD dwHeight = rcDim.bottom - rcDim.top;
-
 	printf("dwWidth=%d dwHeight=%d\n", dwWidth, dwHeight);
 
-	DWORD dwBufSize = dwWidth*dwHeight * 4;
-
-	BYTE* pBuf = new BYTE[dwBufSize];
+	DWORD dwBufSize = dwWidth*dwHeight * DEF_PIXEL_SIZE;
 
 	CComPtr<IWICImagingFactory> spWICFactory = NULL;
 	HRESULT hr = spWICFactory.CoCreateInstance(CLSID_WICImagingFactory);
@@ -34,20 +30,22 @@ int _tmain(int argc, _TCHAR* argv[]) {
 		return hr;
 	}
 
+	vector<BYTE> buf;
 	int i = 0;
 	do {
 		try {
-			dxgi_manager.get_output_data(pBuf, rcDim);
+			buf = dxgi_manager.get_output_data();
 		} catch (HRESULT e) {
 			hr = e;
 		}
 		i++;
 	} while (hr == DXGI_ERROR_WAIT_TIMEOUT || i < 2);
-
 	if (FAILED(hr)) {
 		printf("get_output_data failed with hr=0x%08x\n", hr);
 		return hr;
 	}
+
+	BYTE* pBuf = buf.data();
 
 	printf("Saving capture to file\n");
 
@@ -104,8 +102,6 @@ int _tmain(int argc, _TCHAR* argv[]) {
 	if (SUCCEEDED(hr)) {
 		hr = spEncoder->Commit();
 	}
-
-	delete[] pBuf;
 
 	return 0;
 }
