@@ -75,33 +75,32 @@ bool DuplicatedOutput::is_primary() {
 }
 
 DXGIManager::DXGIManager() {
-	m_CaptureSource = CSUndefined;
-	SetRect(&m_rcCurrentOutput, 0, 0, 0, 0);
-	m_pBuf = NULL;
-	m_bInitialized = false;
+	m_capture_rect = CSUndefined;
+	SetRect(&m_current_output, 0, 0, 0, 0);
+	m_buf = NULL;
+	m_initialized = false;
 }
 
 DXGIManager::~DXGIManager() {
-	if (m_pBuf) {
-		delete[] m_pBuf;
-		m_pBuf = NULL;
+	if (m_buf) {
+		delete[] m_buf;
+		m_buf = NULL;
 	}
 }
 
-void DXGIManager::SetCaptureSource(CaptureSource cs) {
-	m_CaptureSource = cs;
+void DXGIManager::set_capture_source(CaptureSource cs) {
+	m_capture_rect = cs;
+}
+CaptureSource DXGIManager::get_capture_source() {
+	return m_capture_rect;
 }
 
-CaptureSource DXGIManager::GetCaptureSource() {
-	return m_CaptureSource;
-}
-
-HRESULT DXGIManager::Init() {
-	if (m_bInitialized) {
+HRESULT DXGIManager::init() {
+	if (m_initialized) {
 		return S_OK;
 	}
 
-	HRESULT hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&m_spDXGIFactory1));
+	HRESULT hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&m_factory));
 	if (FAILED(hr)) {
 		printf("Failed to CreateDXGIFactory1 hr=%08x\n", hr);
 		return hr;
@@ -111,7 +110,7 @@ HRESULT DXGIManager::Init() {
 	vector<CComPtr<IDXGIAdapter1>> vAdapters;
 
 	CComPtr<IDXGIAdapter1> spAdapter;
-	for (int i = 0; m_spDXGIFactory1->EnumAdapters1(i, &spAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
+	for (int i = 0; m_factory->EnumAdapters1(i, &spAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
 		vAdapters.push_back(spAdapter);
 		spAdapter.Release();
 	}
@@ -172,7 +171,7 @@ HRESULT DXGIManager::Init() {
 				continue;
 			}
 
-			m_vOutputs.push_back(
+			m_outputs.push_back(
 				DuplicatedOutput(spD3D11Device,
 					spD3D11DeviceContext,
 					spDXGIOutput1,
@@ -186,21 +185,21 @@ HRESULT DXGIManager::Init() {
 		return hr;
 	}
 
-	m_bInitialized = true;
+	m_initialized = true;
 
 	return S_OK;
 }
 
-HRESULT DXGIManager::GetOutputRect(RECT& rc) {
+HRESULT DXGIManager::get_output_rect(RECT& rc) {
 	// Nulling rc just in case...
 	SetRect(&rc, 0, 0, 0, 0);
 
-	HRESULT hr = Init();
+	HRESULT hr = init();
 	if (hr != S_OK) {
 		return hr;
 	}
 
-	vector<DuplicatedOutput> vOutputs = GetOutputDuplication();
+	vector<DuplicatedOutput> vOutputs = get_output_duplication();
 
 	RECT rcShare;
 	SetRect(&rcShare, 0, 0, 0, 0);
@@ -222,14 +221,14 @@ HRESULT DXGIManager::GetOutputRect(RECT& rc) {
 	return S_OK;
 }
 
-HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest) {
+HRESULT DXGIManager::get_output_bits(BYTE* pBits, RECT& rcDest) {
 	HRESULT hr = S_OK;
 
 	DWORD dwDestWidth = rcDest.right - rcDest.left;
 	DWORD dwDestHeight = rcDest.bottom - rcDest.top;
 
 	RECT rcOutput;
-	hr = GetOutputRect(rcOutput);
+	hr = get_output_rect(rcOutput);
 	if (FAILED(hr)) {
 		return hr;
 	}
@@ -240,20 +239,20 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest) {
 	BYTE* pBuf = NULL;
 	if (rcOutput.right > (LONG)dwDestWidth || rcOutput.bottom > (LONG)dwDestHeight) {
 		// Output is larger than pBits dimensions
-		if (!m_pBuf || !EqualRect(&m_rcCurrentOutput, &rcOutput)) {
+		if (!m_buf || !EqualRect(&m_current_output, &rcOutput)) {
 			DWORD dwBufSize = dwOutputWidth*dwOutputHeight * 4;
 
-			if (m_pBuf) {
-				delete[] m_pBuf;
-				m_pBuf = NULL;
+			if (m_buf) {
+				delete[] m_buf;
+				m_buf = NULL;
 			}
 
-			m_pBuf = new BYTE[dwBufSize];
+			m_buf = new BYTE[dwBufSize];
 
-			CopyRect(&m_rcCurrentOutput, &rcOutput);
+			CopyRect(&m_current_output, &rcOutput);
 		}
 
-		pBuf = m_pBuf;
+		pBuf = m_buf;
 	}
 	else {
 		// Output is smaller than pBits dimensions
@@ -262,7 +261,7 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest) {
 		dwOutputHeight = dwDestHeight;
 	}
 
-	vector<DuplicatedOutput> vOutputs = GetOutputDuplication();
+	vector<DuplicatedOutput> vOutputs = get_output_duplication();
 
 	for (vector<DuplicatedOutput>::iterator iter = vOutputs.begin();
 		iter != vOutputs.end();
@@ -384,13 +383,13 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest) {
 	return hr;
 }
 
-vector<DuplicatedOutput> DXGIManager::GetOutputDuplication() {
+vector<DuplicatedOutput> DXGIManager::get_output_duplication() {
 	vector<DuplicatedOutput> outputs;
-	switch (m_CaptureSource) {
+	switch (m_capture_rect) {
 	case CSMonitor1: {
 		// Return the one with is_primary
-		for (vector<DuplicatedOutput>::iterator iter = m_vOutputs.begin();
-			iter != m_vOutputs.end();
+		for (vector<DuplicatedOutput>::iterator iter = m_outputs.begin();
+			iter != m_outputs.end();
 			iter++) {
 			DuplicatedOutput& out = *iter;
 			if (out.is_primary()) {
@@ -403,8 +402,8 @@ vector<DuplicatedOutput> DXGIManager::GetOutputDuplication() {
 
 	case CSMonitor2: {
 		// Return the first with !is_primary
-		for (vector<DuplicatedOutput>::iterator iter = m_vOutputs.begin();
-			iter != m_vOutputs.end();
+		for (vector<DuplicatedOutput>::iterator iter = m_outputs.begin();
+			iter != m_outputs.end();
 			iter++) {
 			DuplicatedOutput& out = *iter;
 			if (!out.is_primary()) {
@@ -417,8 +416,8 @@ vector<DuplicatedOutput> DXGIManager::GetOutputDuplication() {
 
 	case CSDesktop: {
 		// Return all outputs
-		for (vector<DuplicatedOutput>::iterator iter = m_vOutputs.begin();
-			iter != m_vOutputs.end();
+		for (vector<DuplicatedOutput>::iterator iter = m_outputs.begin();
+			iter != m_outputs.end();
 			iter++) {
 			DuplicatedOutput& out = *iter;
 			outputs.push_back(out);

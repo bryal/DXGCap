@@ -14,10 +14,10 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	DXGIManager dxgi_manager;
 
-	dxgi_manager.SetCaptureSource(CSMonitor1);
+	dxgi_manager.set_capture_source(CSMonitor1);
 
 	RECT rcDim;
-	dxgi_manager.GetOutputRect(rcDim);
+	dxgi_manager.get_output_rect(rcDim);
 
 	DWORD dwWidth = rcDim.right - rcDim.left;
 	DWORD dwHeight = rcDim.bottom - rcDim.top;
@@ -36,12 +36,12 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	int i = 0;
 	do {
-		hr = dxgi_manager.GetOutputBits(pBuf, rcDim);
+		hr = dxgi_manager.get_output_bits(pBuf, rcDim);
 		i++;
 	} while (hr == DXGI_ERROR_WAIT_TIMEOUT || i < 2);
 
 	if (FAILED(hr)) {
-		printf("GetOutputBits failed with hr=0x%08x\n", hr);
+		printf("get_output_bits failed with hr=0x%08x\n", hr);
 		return hr;
 	}
 

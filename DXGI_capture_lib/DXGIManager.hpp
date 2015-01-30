@@ -45,22 +45,21 @@ class DXGIManager {
 public:
 	DXGIManager();
 	~DXGIManager();
-	void SetCaptureSource(CaptureSource type);
-	CaptureSource GetCaptureSource();
+	void set_capture_source(CaptureSource type);
+	CaptureSource get_capture_source();
 
-	HRESULT GetOutputRect(RECT& rc);
-	HRESULT GetOutputBits(BYTE* pBits, RECT& rcDest);
+	HRESULT get_output_rect(RECT& rc);
+	HRESULT get_output_bits(BYTE* pBits, RECT& rcDest);
 private:
-	HRESULT Init();
-	int GetMonitorCount();
-	vector<DuplicatedOutput> GetOutputDuplication();
+	HRESULT init();
+	vector<DuplicatedOutput> get_output_duplication();
 private:
-	CComPtr<IDXGIFactory1> m_spDXGIFactory1;
-	vector<DuplicatedOutput> m_vOutputs;
-	bool m_bInitialized;
-	CaptureSource m_CaptureSource;
-	RECT m_rcCurrentOutput;
-	BYTE* m_pBuf;
+	CComPtr<IDXGIFactory1> m_factory;
+	vector<DuplicatedOutput> m_outputs;
+	bool m_initialized;
+	CaptureSource m_capture_rect;
+	RECT m_current_output;
+	BYTE* m_buf;
 
 	CComPtr<IWICImagingFactory> m_spWICFactory;
 };
