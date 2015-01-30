@@ -5,8 +5,7 @@
 
 DXGIManager g_DXGIManager;
 
-int _tmain(int argc, _TCHAR* argv[])
-{
+int _tmain(int argc, _TCHAR* argv[]) {
 	printf("DXGICaptureSample. Fast windows screen capture\n");
 	printf("Capturing desktop to: capture.bmp\n");
 	printf("Log: logfile.log\n");
@@ -33,14 +32,12 @@ int _tmain(int argc, _TCHAR* argv[])
 		return hr;
 
 	int i = 0;
-	do
-	{
+	do {
 		hr = g_DXGIManager.GetOutputBits(pBuf, rcDim);
 		i++;
 	} while (hr == DXGI_ERROR_WAIT_TIMEOUT || i < 2);
 
-	if (FAILED(hr))
-	{
+	if (FAILED(hr)) {
 		printf("GetOutputBits failed with hr=0x%08x\n", hr);
 		return hr;
 	}

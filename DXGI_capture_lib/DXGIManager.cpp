@@ -10,19 +10,16 @@ DuplicatedOutput::DuplicatedOutput(ID3D11Device* device,
 		m_output(output),
 		m_dxgi_output_dup(output_dup) { }
 
-HRESULT DuplicatedOutput::get_desc(DXGI_OUTPUT_DESC& desc)
-{
+HRESULT DuplicatedOutput::get_desc(DXGI_OUTPUT_DESC& desc) {
 	m_output->GetDesc(&desc);
 	return S_OK;
 }
 
-HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface)
-{
+HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface) {
 	DXGI_OUTDUPL_FRAME_INFO fi;
 	CComPtr<IDXGIResource> spDXGIResource;
 	HRESULT hr = m_dxgi_output_dup->AcquireNextFrame(20, &fi, &spDXGIResource);
-	if (FAILED(hr))
-	{
+	if (FAILED(hr)) {
 		printf("m_DXGIOutputDuplication->AcquireNextFrame failed with hr=0x%08x\n", hr);
 		return hr;
 	}
@@ -60,63 +57,53 @@ HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface)
 	return hr;
 }
 
-HRESULT DuplicatedOutput::release_frame()
-{
+HRESULT DuplicatedOutput::release_frame() {
 	m_dxgi_output_dup->ReleaseFrame();
 	return S_OK;
 }
 
-bool DuplicatedOutput::is_primary()
-{
+bool DuplicatedOutput::is_primary() {
 	DXGI_OUTPUT_DESC outdesc;
 	m_output->GetDesc(&outdesc);
 
 	MONITORINFO mi;
 	mi.cbSize = sizeof(MONITORINFO);
 	GetMonitorInfo(outdesc.Monitor, &mi);
-	if (mi.dwFlags & MONITORINFOF_PRIMARY)
-	{
+	if (mi.dwFlags & MONITORINFOF_PRIMARY) {
 		return true;
 	}
 	return false;
 }
 
-DXGIManager::DXGIManager()
-{
+DXGIManager::DXGIManager() {
 	m_CaptureSource = CSUndefined;
 	SetRect(&m_rcCurrentOutput, 0, 0, 0, 0);
 	m_pBuf = NULL;
 	m_bInitialized = false;
 }
 
-DXGIManager::~DXGIManager()
-{
-	if (m_pBuf)
-	{
+DXGIManager::~DXGIManager() {
+	if (m_pBuf) {
 		delete[] m_pBuf;
 		m_pBuf = NULL;
 	}
 }
 
-HRESULT DXGIManager::SetCaptureSource(CaptureSource cs)
-{
+HRESULT DXGIManager::SetCaptureSource(CaptureSource cs) {
 	m_CaptureSource = cs;
 	return S_OK;
 }
 
-CaptureSource DXGIManager::GetCaptureSource()
-{
+CaptureSource DXGIManager::GetCaptureSource() {
 	return m_CaptureSource;
 }
 
-HRESULT DXGIManager::Init()
-{
+HRESULT DXGIManager::Init() {
 	if (m_bInitialized)
 		return S_OK;
 
 	HRESULT hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&m_spDXGIFactory1));
-	if (FAILED(hr))
-	{
+	if (FAILED(hr)) {
 		printf("Failed to CreateDXGIFactory1 hr=%08x\n", hr);
 		return hr;
 	}
@@ -125,8 +112,7 @@ HRESULT DXGIManager::Init()
 	vector<CComPtr<IDXGIAdapter1>> vAdapters;
 
 	CComPtr<IDXGIAdapter1> spAdapter;
-	for (int i = 0; m_spDXGIFactory1->EnumAdapters1(i, &spAdapter) != DXGI_ERROR_NOT_FOUND; i++)
-	{
+	for (int i = 0; m_spDXGIFactory1->EnumAdapters1(i, &spAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
 		vAdapters.push_back(spAdapter);
 		spAdapter.Release();
 	}
@@ -134,13 +120,11 @@ HRESULT DXGIManager::Init()
 	// Iterating over all adapters to get all outputs
 	for (vector<CComPtr<IDXGIAdapter1>>::iterator AdapterIter = vAdapters.begin();
 		AdapterIter != vAdapters.end();
-		AdapterIter++)
-	{
+		AdapterIter++) {
 		vector<CComPtr<IDXGIOutput>> vOutputs;
 
 		CComPtr<IDXGIOutput> spDXGIOutput;
-		for (int i = 0; (*AdapterIter)->EnumOutputs(i, &spDXGIOutput) != DXGI_ERROR_NOT_FOUND; i++)
-		{
+		for (int i = 0; (*AdapterIter)->EnumOutputs(i, &spDXGIOutput) != DXGI_ERROR_NOT_FOUND; i++) {
 			DXGI_OUTPUT_DESC outputDesc;
 			spDXGIOutput->GetDesc(&outputDesc);
 
@@ -153,8 +137,7 @@ HRESULT DXGIManager::Init()
 				outputDesc.DesktopCoordinates.right,
 				outputDesc.DesktopCoordinates.bottom);
 
-			if (outputDesc.AttachedToDesktop)
-			{
+			if (outputDesc.AttachedToDesktop) {
 				vOutputs.push_back(spDXGIOutput);
 			}
 
@@ -169,16 +152,14 @@ HRESULT DXGIManager::Init()
 		CComPtr<ID3D11DeviceContext> spD3D11DeviceContext;
 		D3D_FEATURE_LEVEL fl = D3D_FEATURE_LEVEL_9_1;
 		hr = D3D11CreateDevice((*AdapterIter), D3D_DRIVER_TYPE_UNKNOWN, NULL, 0, NULL, 0, D3D11_SDK_VERSION, &spD3D11Device, &fl, &spD3D11DeviceContext);
-		if (FAILED(hr))
-		{
+		if (FAILED(hr)) {
 			printf("Failed to create D3D11CreateDevice hr=%08x\n", hr);
 			return hr;
 		}
 
 		for (std::vector<CComPtr<IDXGIOutput>>::iterator OutputIter = vOutputs.begin();
 			OutputIter != vOutputs.end();
-			OutputIter++)
-		{
+			OutputIter++) {
 			CComQIPtr<IDXGIOutput1> spDXGIOutput1 = *OutputIter;
 			CComQIPtr<IDXGIDevice1> spDXGIDevice = spD3D11Device;
 			if (!spDXGIOutput1 || !spDXGIDevice)
@@ -198,8 +179,7 @@ HRESULT DXGIManager::Init()
 	}
 
 	hr = m_spWICFactory.CoCreateInstance(CLSID_WICImagingFactory);
-	if (FAILED(hr))
-	{
+	if (FAILED(hr)) {
 		printf("Failed to create WICImagingFactory hr=%08x\n", hr);
 		return hr;
 	}
@@ -209,8 +189,7 @@ HRESULT DXGIManager::Init()
 	return S_OK;
 }
 
-HRESULT DXGIManager::GetOutputRect(RECT& rc)
-{
+HRESULT DXGIManager::GetOutputRect(RECT& rc) {
 	// Nulling rc just in case...
 	SetRect(&rc, 0, 0, 0, 0);
 
@@ -225,8 +204,7 @@ HRESULT DXGIManager::GetOutputRect(RECT& rc)
 
 	for (vector<DuplicatedOutput>::iterator iter = vOutputs.begin();
 		iter != vOutputs.end();
-		iter++)
-	{
+		iter++) {
 		DuplicatedOutput& out = *iter;
 
 		DXGI_OUTPUT_DESC outDesc;
@@ -241,8 +219,7 @@ HRESULT DXGIManager::GetOutputRect(RECT& rc)
 	return S_OK;
 }
 
-HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
-{
+HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest) {
 	HRESULT hr = S_OK;
 
 	DWORD dwDestWidth = rcDest.right - rcDest.left;
@@ -257,15 +234,12 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 	DWORD dwOutputHeight = rcOutput.bottom - rcOutput.top;
 
 	BYTE* pBuf = NULL;
-	if (rcOutput.right > (LONG)dwDestWidth || rcOutput.bottom > (LONG)dwDestHeight)
-	{
+	if (rcOutput.right > (LONG)dwDestWidth || rcOutput.bottom > (LONG)dwDestHeight) {
 		// Output is larger than pBits dimensions
-		if (!m_pBuf || !EqualRect(&m_rcCurrentOutput, &rcOutput))
-		{
+		if (!m_pBuf || !EqualRect(&m_rcCurrentOutput, &rcOutput)) {
 			DWORD dwBufSize = dwOutputWidth*dwOutputHeight * 4;
 
-			if (m_pBuf)
-			{
+			if (m_pBuf) {
 				delete[] m_pBuf;
 				m_pBuf = NULL;
 			}
@@ -277,8 +251,7 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 
 		pBuf = m_pBuf;
 	}
-	else
-	{
+	else {
 		// Output is smaller than pBits dimensions
 		pBuf = pBits;
 		dwOutputWidth = dwDestWidth;
@@ -289,8 +262,7 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 
 	for (vector<DuplicatedOutput>::iterator iter = vOutputs.begin();
 		iter != vOutputs.end();
-		iter++)
-	{
+		iter++) {
 		DuplicatedOutput& out = *iter;
 
 		DXGI_OUTPUT_DESC outDesc;
@@ -313,55 +285,43 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 
 		DWORD dwMapPitchPixels = map.Pitch / 4;
 
-		switch (outDesc.Rotation)
-		{
-		case DXGI_MODE_ROTATION_IDENTITY:
-		{
+		switch (outDesc.Rotation) {
+		case DXGI_MODE_ROTATION_IDENTITY: {
 			// Just copying
 			DWORD dwStripe = dwWidth * 4;
-			for (unsigned int i = 0; i<dwHeight; i++)
-			{
+			for (unsigned int i = 0; i<dwHeight; i++) {
 				memcpy_s(pBuf + (rcDesktop.left + (i + rcDesktop.top)*dwOutputWidth) * 4, dwStripe, map.pBits + i*map.Pitch, dwStripe);
 			}
 		}
 		break;
-		case DXGI_MODE_ROTATION_ROTATE90:
-		{
+		case DXGI_MODE_ROTATION_ROTATE90: {
 			// Rotating at 90 degrees
 			DWORD* pSrc = (DWORD*)map.pBits;
 			DWORD* pDst = (DWORD*)pBuf;
-			for (unsigned int j = 0; j<dwHeight; j++)
-			{
-				for (unsigned int i = 0; i<dwWidth; i++)
-				{
+			for (unsigned int j = 0; j<dwHeight; j++) {
+				for (unsigned int i = 0; i<dwWidth; i++) {
 					*(pDst + (rcDesktop.left + (j + rcDesktop.top)*dwOutputWidth) + i) = *(pSrc + j + dwMapPitchPixels*(dwWidth - i - 1));
 				}
 			}
 		}
 		break;
-		case DXGI_MODE_ROTATION_ROTATE180:
-		{
+		case DXGI_MODE_ROTATION_ROTATE180: {
 			// Rotating at 180 degrees
 			DWORD* pSrc = (DWORD*)map.pBits;
 			DWORD* pDst = (DWORD*)pBuf;
-			for (unsigned int j = 0; j<dwHeight; j++)
-			{
-				for (unsigned int i = 0; i<dwWidth; i++)
-				{
+			for (unsigned int j = 0; j<dwHeight; j++) {
+				for (unsigned int i = 0; i<dwWidth; i++) {
 					*(pDst + (rcDesktop.left + (j + rcDesktop.top)*dwOutputWidth) + i) = *(pSrc + (dwWidth - i - 1) + dwMapPitchPixels*(dwHeight - j - 1));
 				}
 			}
 		}
 		break;
-		case DXGI_MODE_ROTATION_ROTATE270:
-		{
+		case DXGI_MODE_ROTATION_ROTATE270: {
 			// Rotating at 270 degrees
 			DWORD* pSrc = (DWORD*)map.pBits;
 			DWORD* pDst = (DWORD*)pBuf;
-			for (unsigned int j = 0; j<dwHeight; j++)
-			{
-				for (unsigned int i = 0; i<dwWidth; i++)
-				{
+			for (unsigned int j = 0; j<dwHeight; j++) {
+				for (unsigned int i = 0; i<dwWidth; i++) {
 					*(pDst + (rcDesktop.left + (j + rcDesktop.top)*dwOutputWidth) + i) = *(pSrc + (dwHeight - j - 1) + dwMapPitchPixels*i);
 				}
 			}
@@ -379,8 +339,7 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 
 
 	// We have the pBuf filled with current desktop/monitor image.
-	if (pBuf != pBits)
-	{
+	if (pBuf != pBits) {
 		// pBuf contains the image that should be resized
 		CComPtr<IWICBitmap> spBitmap = NULL;
 		hr = m_spWICFactory->CreateBitmapFromMemory(dwOutputWidth, dwOutputHeight, GUID_WICPixelFormat32bppBGRA, dwOutputWidth * 4, dwOutputWidth*dwOutputHeight * 4, (BYTE*)pBuf, &spBitmap);
@@ -400,13 +359,11 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 		DWORD scaledWidth = dwDestWidth;
 		DWORD scaledHeight = dwDestHeight;
 
-		if (aspect > 1)
-		{
+		if (aspect > 1) {
 			scaledWidth = dwDestWidth;
 			scaledHeight = (DWORD)(dwDestWidth / aspect);
 		}
-		else
-		{
+		else {
 			scaledWidth = (DWORD)(aspect*dwDestHeight);
 			scaledHeight = dwDestHeight;
 		}
@@ -419,21 +376,16 @@ HRESULT DXGIManager::GetOutputBits(BYTE* pBits, RECT& rcDest)
 	return hr;
 }
 
-vector<DuplicatedOutput> DXGIManager::GetOutputDuplication()
-{
+vector<DuplicatedOutput> DXGIManager::GetOutputDuplication() {
 	vector<DuplicatedOutput> outputs;
-	switch (m_CaptureSource)
-	{
-	case CSMonitor1:
-	{
+	switch (m_CaptureSource) {
+	case CSMonitor1: {
 		// Return the one with is_primary
 		for (vector<DuplicatedOutput>::iterator iter = m_vOutputs.begin();
 			iter != m_vOutputs.end();
-			iter++)
-		{
+			iter++) {
 			DuplicatedOutput& out = *iter;
-			if (out.is_primary())
-			{
+			if (out.is_primary()) {
 				outputs.push_back(out);
 				break;
 			}
@@ -441,16 +393,13 @@ vector<DuplicatedOutput> DXGIManager::GetOutputDuplication()
 	}
 	break;
 
-	case CSMonitor2:
-	{
+	case CSMonitor2: {
 		// Return the first with !is_primary
 		for (vector<DuplicatedOutput>::iterator iter = m_vOutputs.begin();
 			iter != m_vOutputs.end();
-			iter++)
-		{
+			iter++) {
 			DuplicatedOutput& out = *iter;
-			if (!out.is_primary())
-			{
+			if (!out.is_primary()) {
 				outputs.push_back(out);
 				break;
 			}
@@ -458,13 +407,11 @@ vector<DuplicatedOutput> DXGIManager::GetOutputDuplication()
 	}
 	break;
 
-	case CSDesktop:
-	{
+	case CSDesktop: {
 		// Return all outputs
 		for (vector<DuplicatedOutput>::iterator iter = m_vOutputs.begin();
 			iter != m_vOutputs.end();
-			iter++)
-		{
+			iter++) {
 			DuplicatedOutput& out = *iter;
 			outputs.push_back(out);
 		}
@@ -474,15 +421,13 @@ vector<DuplicatedOutput> DXGIManager::GetOutputDuplication()
 	return outputs;
 }
 
-BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData)
-{
+BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData) {
 	int *Count = (int*)dwData;
 	(*Count)++;
 	return TRUE;
 }
 
-int DXGIManager::GetMonitorCount()
-{
+int DXGIManager::GetMonitorCount() {
 	int Count = 0;
 	if (EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, (LPARAM)&Count))
 		return Count;
