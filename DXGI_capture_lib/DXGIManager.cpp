@@ -98,16 +98,18 @@ void DXGIManager::init() {
 		return;
 	}
 
-	CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&m_factory));
+	CComPtr<IDXGIFactory1> factory;
+	CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&factory));
 
 	// Getting all adapters
 	vector<CComPtr<IDXGIAdapter1>> vAdapters;
 
 	CComPtr<IDXGIAdapter1> spAdapter;
-	for (int i = 0; m_factory->EnumAdapters1(i, &spAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
+	for (int i = 0; factory->EnumAdapters1(i, &spAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
 		vAdapters.push_back(spAdapter);
 		spAdapter.Release();
 	}
+	factory.Release();
 
 	// Iterating over all adapters to get all outputs
 	for (vector<CComPtr<IDXGIAdapter1>>::iterator AdapterIter = vAdapters.begin();
