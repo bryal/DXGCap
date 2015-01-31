@@ -50,28 +50,28 @@ int _tmain(int argc, _TCHAR* argv[]) {
 	printf("Saving capture to file\n");
 
 	CComPtr<IWICBitmap> spBitmap = NULL;
-	TRY(spWICFactory->CreateBitmapFromMemory(dwWidth, dwHeight, GUID_WICPixelFormat32bppBGRA, dwWidth * 4, dwBufSize, (BYTE*)pBuf, &spBitmap));
+	TRY_RETURN(spWICFactory->CreateBitmapFromMemory(dwWidth, dwHeight, GUID_WICPixelFormat32bppBGRA, dwWidth * 4, dwBufSize, (BYTE*)pBuf, &spBitmap));
 
 	CComPtr<IWICStream> spStream = NULL;
 
-	TRY(spWICFactory->CreateStream(&spStream));
-	TRY(spStream->InitializeFromFilename(L"capture.bmp", GENERIC_WRITE));
+	TRY_RETURN(spWICFactory->CreateStream(&spStream));
+	TRY_RETURN(spStream->InitializeFromFilename(L"capture.bmp", GENERIC_WRITE));
 
 	CComPtr<IWICBitmapEncoder> spEncoder = NULL;
-	TRY(spWICFactory->CreateEncoder(GUID_ContainerFormatBmp, NULL, &spEncoder));
-	TRY(spEncoder->Initialize(spStream, WICBitmapEncoderNoCache));
+	TRY_RETURN(spWICFactory->CreateEncoder(GUID_ContainerFormatBmp, NULL, &spEncoder));
+	TRY_RETURN(spEncoder->Initialize(spStream, WICBitmapEncoderNoCache));
 
 	CComPtr<IWICBitmapFrameEncode> spFrame = NULL;
-	TRY(spEncoder->CreateNewFrame(&spFrame, NULL));
-	TRY(spFrame->Initialize(NULL));
-	TRY(spFrame->SetSize(dwWidth, dwHeight));
+	TRY_RETURN(spEncoder->CreateNewFrame(&spFrame, NULL));
+	TRY_RETURN(spFrame->Initialize(NULL));
+	TRY_RETURN(spFrame->SetSize(dwWidth, dwHeight));
 
 	WICPixelFormatGUID format;
-	TRY(spBitmap->GetPixelFormat(&format));
-	TRY(hr = spFrame->SetPixelFormat(&format));
-	TRY(hr = spFrame->WriteSource(spBitmap, NULL));
-	TRY(hr = spFrame->Commit());
-	TRY(hr = spEncoder->Commit());
+	TRY_RETURN(spBitmap->GetPixelFormat(&format));
+	TRY_RETURN(hr = spFrame->SetPixelFormat(&format));
+	TRY_RETURN(hr = spFrame->WriteSource(spBitmap, NULL));
+	TRY_RETURN(hr = spFrame->Commit());
+	TRY_RETURN(hr = spEncoder->Commit());
 
 	return 0;
 }

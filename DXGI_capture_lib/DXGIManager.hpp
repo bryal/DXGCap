@@ -14,11 +14,20 @@
 // The default format of B8G8R8A8 gives a pixel-size of 4 bytes
 #define DEF_PIXEL_SIZE 4
 
-#define TRY(expr) { \
+// Try performing the expression with return type HRESULT. If the result is a failure, return it.
+#define TRY_RETURN(expr) { \
 	HRESULT e = expr; \
 	if (FAILED(e)) { \
 		printf(#expr " failed with error: %x\n", e); \
 		return e; \
+	} \
+}
+// -''- If the result is a failure, throw it as exception.
+#define TRY_EXCEPT(expr) { \
+	HRESULT e = expr; \
+	if (FAILED(e)) { \
+		printf(#expr " failed with error: %x\n", e); \
+		throw e; \
 	} \
 }
 
@@ -49,14 +58,13 @@ public:
 	~DXGIManager();
 	void set_capture_source(UINT16 cs);
 	UINT16 get_capture_source();
-	HRESULT get_output_rect(RECT& rc);
+	void get_output_rect(RECT& rc);
 	vector<BYTE> get_output_data();
 private:
 	void init();
 	DuplicatedOutput get_output_duplication();
 	
 	vector<DuplicatedOutput> m_out_dups;
-	bool m_initialized;
 	UINT16 m_capture_source;
 	RECT m_output_rect;
 	BYTE* m_buf;

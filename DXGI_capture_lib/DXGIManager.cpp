@@ -74,7 +74,7 @@ bool DuplicatedOutput::is_primary() {
 	return false;
 }
 
-DXGIManager::DXGIManager(): m_capture_source(0), m_initialized(false) {
+DXGIManager::DXGIManager(): m_capture_source(0) {
 	SetRect(&m_output_rect, 0, 0, 0, 0);
 	init();
 }
@@ -94,12 +94,8 @@ UINT16 DXGIManager::get_capture_source() {
 }
 
 void DXGIManager::init() {
-	if (m_initialized) {
-		return;
-	}
-
 	CComPtr<IDXGIFactory1> factory;
-	CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&factory));
+	TRY_EXCEPT(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&factory)));
 
 	// Getting all adapters
 	vector<CComPtr<IDXGIAdapter1>> vAdapters;
@@ -109,12 +105,9 @@ void DXGIManager::init() {
 		vAdapters.push_back(spAdapter);
 		spAdapter.Release();
 	}
-	factory.Release();
 
 	// Iterating over all adapters to get all outputs
-	for (vector<CComPtr<IDXGIAdapter1>>::iterator AdapterIter = vAdapters.begin();
-		AdapterIter != vAdapters.end();
-		AdapterIter++) {
+	for (auto AdapterIter = vAdapters.begin(); AdapterIter != vAdapters.end(); AdapterIter++) {
 		vector<CComPtr<IDXGIOutput>> vOutputs;
 
 		CComPtr<IDXGIOutput> spDXGIOutput;
@@ -146,13 +139,13 @@ void DXGIManager::init() {
 		CComPtr<ID3D11Device> spD3D11Device;
 		CComPtr<ID3D11DeviceContext> spD3D11DeviceContext;
 		D3D_FEATURE_LEVEL fl = D3D_FEATURE_LEVEL_9_1;
-		D3D11CreateDevice((*AdapterIter),
+		TRY_EXCEPT(D3D11CreateDevice((*AdapterIter),
 			D3D_DRIVER_TYPE_UNKNOWN,
 			NULL, 0, NULL, 0,
 			D3D11_SDK_VERSION,
 			&spD3D11Device,
 			&fl,
-			&spD3D11DeviceContext);
+			&spD3D11DeviceContext));
 
 		for (auto out_it = vOutputs.begin(); out_it != vOutputs.end(); out_it++) {
 			CComQIPtr<IDXGIOutput1> spDXGIOutput1 = *out_it;
@@ -175,20 +168,16 @@ void DXGIManager::init() {
 		}
 	}
 
-	m_initialized = true;
-
 	return;
 }
 
-HRESULT DXGIManager::get_output_rect(RECT& rc) {
+void DXGIManager::get_output_rect(RECT& rc) {
 	DuplicatedOutput output = get_output_duplication();
 
 	DXGI_OUTPUT_DESC outDesc;
 	output.get_desc(outDesc);
 
 	CopyRect(&rc, &outDesc.DesktopCoordinates);
-
-	return S_OK;
 }
 
 vector<BYTE> DXGIManager::get_output_data() {
