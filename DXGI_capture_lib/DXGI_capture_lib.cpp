@@ -16,8 +16,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	dxgi_manager.set_capture_source(0);
 
-	RECT rcDim;
-	dxgi_manager.get_output_rect(rcDim);
+	RECT rcDim = dxgi_manager.get_output_rect();
 	DWORD dwWidth = rcDim.right - rcDim.left;
 	DWORD dwHeight = rcDim.bottom - rcDim.top;
 	printf("dwWidth=%d dwHeight=%d\n", dwWidth, dwHeight);

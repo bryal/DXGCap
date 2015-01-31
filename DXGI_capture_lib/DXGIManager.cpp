@@ -1,5 +1,6 @@
 #include "DXGIManager.hpp"
 
+// TODO: add tests!!
 
 DuplicatedOutput::DuplicatedOutput(ID3D11Device* device,
 	ID3D11DeviceContext* context,
@@ -10,51 +11,36 @@ DuplicatedOutput::DuplicatedOutput(ID3D11Device* device,
 		m_output(output),
 		m_dxgi_output_dup(output_dup) { }
 
-void DuplicatedOutput::get_desc(DXGI_OUTPUT_DESC& desc) {
+DXGI_OUTPUT_DESC DuplicatedOutput::get_desc() {
+	DXGI_OUTPUT_DESC desc;
 	m_output->GetDesc(&desc);
+	return desc;
 }
 
-HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** pDXGISurface) {
-	DXGI_OUTDUPL_FRAME_INFO fi;
-	CComPtr<IDXGIResource> spDXGIResource;
-	HRESULT hr = m_dxgi_output_dup->AcquireNextFrame(20, &fi, &spDXGIResource);
-	if (FAILED(hr)) {
-		printf("m_DXGIOutputDuplication->AcquireNextFrame failed with hr=0x%08x\n", hr);
-		return hr;
-	}
+HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** out_surface) {
+	DXGI_OUTDUPL_FRAME_INFO frame_info;
+	CComPtr<IDXGIResource> frame_resource;
+	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(20, &frame_info, &frame_resource));
 
-	CComQIPtr<ID3D11Texture2D> spTextureResource = spDXGIResource;
+	CComQIPtr<ID3D11Texture2D> frame_texture = frame_resource;
+	D3D11_TEXTURE2D_DESC texture_desc;
+	frame_texture->GetDesc(&texture_desc);
 
-	D3D11_TEXTURE2D_DESC desc;
-	spTextureResource->GetDesc(&desc);
+	// Comfigure the description to make the texture readable
+	texture_desc.Usage = D3D11_USAGE_STAGING;
+	texture_desc.BindFlags = 0;
+	texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+	texture_desc.MiscFlags = 0;
 
-	D3D11_TEXTURE2D_DESC texDesc;
-	ZeroMemory(&texDesc, sizeof(texDesc));
-	texDesc.Width = desc.Width;
-	texDesc.Height = desc.Height;
-	texDesc.MipLevels = 1;
-	texDesc.ArraySize = 1;
-	texDesc.SampleDesc.Count = 1;
-	texDesc.SampleDesc.Quality = 0;
-	texDesc.Usage = D3D11_USAGE_STAGING;
-	texDesc.Format = desc.Format;
-	texDesc.BindFlags = 0;
-	texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-	texDesc.MiscFlags = 0;
+	CComPtr<ID3D11Texture2D> readable_texture;
+	TRY_RETURN(m_device->CreateTexture2D(&texture_desc, NULL, &readable_texture));
+	m_device_context->CopyResource(readable_texture, frame_texture);
 
-	CComPtr<ID3D11Texture2D> spD3D11Texture2D = NULL;
-	hr = m_device->CreateTexture2D(&texDesc, NULL, &spD3D11Texture2D);
-	if (FAILED(hr)) {
-		return hr;
-	}
+	CComQIPtr<IDXGISurface1> texture_surface = readable_texture;
 
-	m_device_context->CopyResource(spD3D11Texture2D, spTextureResource);
+	*out_surface = texture_surface.Detach();
 
-	CComQIPtr<IDXGISurface1> spDXGISurface = spD3D11Texture2D;
-
-	*pDXGISurface = spDXGISurface.Detach();
-
-	return hr;
+	return S_OK;
 }
 
 void DuplicatedOutput::release_frame() {
@@ -171,21 +157,15 @@ void DXGIManager::init() {
 	return;
 }
 
-void DXGIManager::get_output_rect(RECT& rc) {
+RECT DXGIManager::get_output_rect() {
 	DuplicatedOutput output = get_output_duplication();
+	DXGI_OUTPUT_DESC outDesc = output.get_desc();
 
-	DXGI_OUTPUT_DESC outDesc;
-	output.get_desc(outDesc);
-
-	CopyRect(&rc, &outDesc.DesktopCoordinates);
+	return outDesc.DesktopCoordinates;
 }
 
 vector<BYTE> DXGIManager::get_output_data() {
-	RECT output_rect;
-	HRESULT hr = get_output_rect(output_rect);
-	if (FAILED(hr)) {
-		throw hr;
-	}
+	RECT output_rect = get_output_rect();
 
 	DWORD dwOutputWidth = output_rect.right - output_rect.left;
 	DWORD dwOutputHeight = output_rect.bottom - output_rect.top;
@@ -194,22 +174,17 @@ vector<BYTE> DXGIManager::get_output_data() {
 	vector<BYTE> out_buf;
 	out_buf.reserve(buf_size);
 
-	BYTE* pBuf = out_buf.data();
+	BYTE* buf = out_buf.data();
 
 	DuplicatedOutput output = get_output_duplication();
-
-	DXGI_OUTPUT_DESC outDesc;
-	output.get_desc(outDesc);
+	DXGI_OUTPUT_DESC outDesc = output.get_desc();
 	RECT rcOutCoords = outDesc.DesktopCoordinates;
 
-	CComPtr<IDXGISurface1> spDXGISurface1;
-	hr = output.acquire_next_frame(&spDXGISurface1);
-	if (FAILED(hr)) {
-		throw hr;
-	}
+	CComPtr<IDXGISurface1> surface;
+	TRY_EXCEPT(output.acquire_next_frame(&surface));
 
 	DXGI_MAPPED_RECT map;
-	spDXGISurface1->Map(&map, DXGI_MAP_READ);
+	surface->Map(&map, DXGI_MAP_READ);
 
 	RECT rcDesktop = outDesc.DesktopCoordinates;
 	DWORD dwWidth = rcDesktop.right - rcDesktop.left;
@@ -224,14 +199,14 @@ vector<BYTE> DXGIManager::get_output_data() {
 		// Just copying
 		DWORD dwStripe = dwWidth * 4;
 		for (unsigned int i = 0; i<dwHeight; i++) {
-			memcpy_s(pBuf + (rcDesktop.left + (i + rcDesktop.top)*dwOutputWidth) * 4, dwStripe, map.pBits + i*map.Pitch, dwStripe);
+			memcpy_s(buf + (rcDesktop.left + (i + rcDesktop.top)*dwOutputWidth) * 4, dwStripe, map.pBits + i*map.Pitch, dwStripe);
 		}
 	}
 	break;
 	case DXGI_MODE_ROTATION_ROTATE90: {
 		// Rotating at 90 degrees
 		DWORD* pSrc = (DWORD*)map.pBits;
-		DWORD* pDst = (DWORD*)pBuf;
+		DWORD* pDst = (DWORD*)buf;
 		for (unsigned int j = 0; j<dwHeight; j++) {
 			for (unsigned int i = 0; i<dwWidth; i++) {
 				*(pDst + (rcDesktop.left + (j + rcDesktop.top)*dwOutputWidth) + i) = *(pSrc + j + dwMapPitchPixels*(dwWidth - i - 1));
@@ -242,7 +217,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 	case DXGI_MODE_ROTATION_ROTATE180: {
 		// Rotating at 180 degrees
 		DWORD* pSrc = (DWORD*)map.pBits;
-		DWORD* pDst = (DWORD*)pBuf;
+		DWORD* pDst = (DWORD*)buf;
 		for (unsigned int j = 0; j<dwHeight; j++) {
 			for (unsigned int i = 0; i<dwWidth; i++) {
 				*(pDst + (rcDesktop.left + (j + rcDesktop.top)*dwOutputWidth) + i) = *(pSrc + (dwWidth - i - 1) + dwMapPitchPixels*(dwHeight - j - 1));
@@ -253,7 +228,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 	case DXGI_MODE_ROTATION_ROTATE270: {
 		// Rotating at 270 degrees
 		DWORD* pSrc = (DWORD*)map.pBits;
-		DWORD* pDst = (DWORD*)pBuf;
+		DWORD* pDst = (DWORD*)buf;
 		for (unsigned int j = 0; j<dwHeight; j++) {
 			for (unsigned int i = 0; i<dwWidth; i++) {
 				*(pDst + (rcDesktop.left + (j + rcDesktop.top)*dwOutputWidth) + i) = *(pSrc + (dwHeight - j - 1) + dwMapPitchPixels*i);
@@ -263,16 +238,10 @@ vector<BYTE> DXGIManager::get_output_data() {
 	break;
 	}
 
-	spDXGISurface1->Unmap();
+	surface->Unmap();
 
 	output.release_frame();
 
-
-	if (FAILED(hr)) {
-		throw hr;
-	}
-
-	// We have the pBuf filled with current desktop/monitor image.
 	return out_buf;
 }
 

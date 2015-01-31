@@ -40,7 +40,7 @@ public:
 		ID3D11DeviceContext* context,
 		IDXGIOutput1* output,
 		IDXGIOutputDuplication* output_dup);
-	void get_desc(DXGI_OUTPUT_DESC& desc);
+	DXGI_OUTPUT_DESC get_desc();
 	HRESULT acquire_next_frame(IDXGISurface1** pD3D11Texture2D);
 	void release_frame();
 	bool is_primary();
@@ -58,7 +58,7 @@ public:
 	~DXGIManager();
 	void set_capture_source(UINT16 cs);
 	UINT16 get_capture_source();
-	void get_output_rect(RECT& rc);
+	RECT get_output_rect();
 	vector<BYTE> get_output_data();
 private:
 	void init();
