@@ -233,6 +233,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 
 	output_dup.release_frame();
 
+	out_buf.resize(buf_size); // Required since modifying the raw vector.data() does not change size
 	return out_buf;
 }
 
