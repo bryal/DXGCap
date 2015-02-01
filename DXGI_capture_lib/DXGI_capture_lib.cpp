@@ -4,7 +4,7 @@
 #include "DXGIManager.hpp"
 
 
-int _tmain(int argc, _TCHAR* argv[]) {
+int main(int argc, _TCHAR* argv[]) {
 	printf("DXGICaptureSample. Fast windows screen capture\n"
 		"Capturing desktop to: capture.bmp\n");
 

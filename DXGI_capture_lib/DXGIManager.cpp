@@ -79,6 +79,7 @@ bool DuplicatedOutput::is_primary() {
 	DXGI_OUTPUT_DESC output_desc;
 	m_output->GetDesc(&output_desc);
 	MONITORINFO monitor_info;
+	monitor_info.cbSize = sizeof(MONITORINFO);
 	GetMonitorInfo(output_desc.Monitor, &monitor_info);
 
 	return monitor_info.dwFlags & MONITORINFOF_PRIMARY;
@@ -240,11 +241,13 @@ DuplicatedOutput DXGIManager::get_output_duplication() {
 			}
 		}
 	} else { // Find the m_capture_source:th, non-primary output
-		for (UINT32 i = 0; i < m_capture_source && out_it != m_out_dups.end(); i++) {
-			if (!out_it->is_primary()) {
-				i++;
-			}
+		if (out_it->is_primary()) {
 			out_it++;
+		}
+		for (UINT32 i = 1; out_it != m_out_dups.end(); i++, out_it++) {
+			if (i >= m_capture_source && !out_it->is_primary()) {
+				break;
+			}
 		}
 	}
 	return *out_it;
