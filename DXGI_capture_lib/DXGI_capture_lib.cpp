@@ -16,12 +16,10 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	dxgi_manager.set_capture_source(0);
 
-	RECT rcDim = dxgi_manager.get_output_rect();
-	DWORD dwWidth = rcDim.right - rcDim.left;
-	DWORD dwHeight = rcDim.bottom - rcDim.top;
-	printf("dwWidth=%d dwHeight=%d\n", dwWidth, dwHeight);
-
-	DWORD dwBufSize = dwWidth*dwHeight * DEF_PIXEL_SIZE;
+	RECT dimensions = dxgi_manager.get_output_rect();
+	UINT32 width = dimensions.right - dimensions.left;
+	UINT32 height = dimensions.bottom - dimensions.top;
+	printf("width=%d height=%d\n", width, height);
 
 	CComPtr<IWICImagingFactory> spWICFactory = NULL;
 	HRESULT hr = spWICFactory.CoCreateInstance(CLSID_WICImagingFactory);
@@ -44,12 +42,10 @@ int _tmain(int argc, _TCHAR* argv[]) {
 		return hr;
 	}
 
-	BYTE* pBuf = buf.data();
-
 	printf("Saving capture to file\n");
 
 	CComPtr<IWICBitmap> spBitmap = NULL;
-	TRY_RETURN(spWICFactory->CreateBitmapFromMemory(dwWidth, dwHeight, GUID_WICPixelFormat32bppBGRA, dwWidth * 4, dwBufSize, (BYTE*)pBuf, &spBitmap));
+	TRY_RETURN(spWICFactory->CreateBitmapFromMemory(width, height, GUID_WICPixelFormat32bppBGRA, width * 4, buf.size(), (BYTE*)buf.data(), &spBitmap));
 
 	CComPtr<IWICStream> spStream = NULL;
 
@@ -63,7 +59,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 	CComPtr<IWICBitmapFrameEncode> spFrame = NULL;
 	TRY_RETURN(spEncoder->CreateNewFrame(&spFrame, NULL));
 	TRY_RETURN(spFrame->Initialize(NULL));
-	TRY_RETURN(spFrame->SetSize(dwWidth, dwHeight));
+	TRY_RETURN(spFrame->SetSize(width, height));
 
 	WICPixelFormatGUID format;
 	TRY_RETURN(spBitmap->GetPixelFormat(&format));

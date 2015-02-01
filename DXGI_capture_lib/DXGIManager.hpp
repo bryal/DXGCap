@@ -12,8 +12,9 @@
 #pragma comment(lib, "d3d11.lib")
 
 // The default format of B8G8R8A8 gives a pixel-size of 4 bytes
-#define DEF_PIXEL_SIZE 4
+#define PIXEL_SIZE 4
 
+// `printf`s in below are for debugging purposes
 // Try performing the expression with return type HRESULT. If the result is a failure, return it.
 #define TRY_RETURN(expr) { \
 	HRESULT e = expr; \
@@ -41,7 +42,7 @@ public:
 		IDXGIOutput1* output,
 		IDXGIOutputDuplication* output_dup);
 	DXGI_OUTPUT_DESC get_desc();
-	HRESULT acquire_next_frame(IDXGISurface1** pD3D11Texture2D);
+	HRESULT acquire_next_frame(IDXGISurface1** out_surface);
 	void release_frame();
 	bool is_primary();
 

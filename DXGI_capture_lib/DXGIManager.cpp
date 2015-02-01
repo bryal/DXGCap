@@ -165,73 +165,64 @@ RECT DXGIManager::get_output_rect() {
 }
 
 vector<BYTE> DXGIManager::get_output_data() {
-	RECT output_rect = get_output_rect();
+	DuplicatedOutput output_dup = get_output_duplication();
+	DXGI_OUTPUT_DESC output_desc = output_dup.get_desc();
+	RECT output_rect = output_desc.DesktopCoordinates;
+	UINT32 output_width = output_rect.right - output_rect.left;
+	UINT32 output_height = output_rect.bottom - output_rect.top;
 
-	DWORD dwOutputWidth = output_rect.right - output_rect.left;
-	DWORD dwOutputHeight = output_rect.bottom - output_rect.top;
-
-	DWORD buf_size = dwOutputWidth*dwOutputHeight * DEF_PIXEL_SIZE;
+	UINT32 buf_size = output_width * output_height * PIXEL_SIZE;
 	vector<BYTE> out_buf;
 	out_buf.reserve(buf_size);
 
-	BYTE* buf = out_buf.data();
-
-	DuplicatedOutput output = get_output_duplication();
-	DXGI_OUTPUT_DESC outDesc = output.get_desc();
-	RECT rcOutCoords = outDesc.DesktopCoordinates;
-
 	CComPtr<IDXGISurface1> surface;
-	TRY_EXCEPT(output.acquire_next_frame(&surface));
+	TRY_EXCEPT(output_dup.acquire_next_frame(&surface));
 
 	DXGI_MAPPED_RECT map;
 	surface->Map(&map, DXGI_MAP_READ);
 
-	RECT rcDesktop = outDesc.DesktopCoordinates;
-	DWORD dwWidth = rcDesktop.right - rcDesktop.left;
-	DWORD dwHeight = rcDesktop.bottom - rcDesktop.top;
+	OffsetRect(&output_rect, -output_rect.left, -output_rect.top);
 
-	OffsetRect(&rcDesktop, -output_rect.left, -output_rect.top);
+	UINT32 dwMapPitchPixels = map.Pitch / PIXEL_SIZE;
 
-	DWORD dwMapPitchPixels = map.Pitch / 4;
-
-	switch (outDesc.Rotation) {
+	switch (output_desc.Rotation) {
 	case DXGI_MODE_ROTATION_IDENTITY: {
 		// Just copying
-		DWORD dwStripe = dwWidth * 4;
-		for (unsigned int i = 0; i<dwHeight; i++) {
-			memcpy_s(buf + (rcDesktop.left + (i + rcDesktop.top)*dwOutputWidth) * 4, dwStripe, map.pBits + i*map.Pitch, dwStripe);
+		UINT32 dwStripe = output_width * PIXEL_SIZE;
+		for (unsigned int i = 0; i<output_height; i++) {
+			memcpy_s(out_buf.data() + (output_rect.left + (i + output_rect.top)*output_width) * 4, dwStripe, map.pBits + i*map.Pitch, dwStripe);
 		}
 	}
 	break;
 	case DXGI_MODE_ROTATION_ROTATE90: {
 		// Rotating at 90 degrees
-		DWORD* pSrc = (DWORD*)map.pBits;
-		DWORD* pDst = (DWORD*)buf;
-		for (unsigned int j = 0; j<dwHeight; j++) {
-			for (unsigned int i = 0; i<dwWidth; i++) {
-				*(pDst + (rcDesktop.left + (j + rcDesktop.top)*dwOutputWidth) + i) = *(pSrc + j + dwMapPitchPixels*(dwWidth - i - 1));
+		UINT32* pSrc = (UINT32*)map.pBits;
+		UINT32* pDst = (UINT32*)out_buf.data();
+		for (unsigned int j = 0; j<output_height; j++) {
+			for (unsigned int i = 0; i<output_width; i++) {
+				*(pDst + (output_rect.left + (j + output_rect.top)*output_width) + i) = *(pSrc + j + dwMapPitchPixels*(output_width - i - 1));
 			}
 		}
 	}
 	break;
 	case DXGI_MODE_ROTATION_ROTATE180: {
 		// Rotating at 180 degrees
-		DWORD* pSrc = (DWORD*)map.pBits;
-		DWORD* pDst = (DWORD*)buf;
-		for (unsigned int j = 0; j<dwHeight; j++) {
-			for (unsigned int i = 0; i<dwWidth; i++) {
-				*(pDst + (rcDesktop.left + (j + rcDesktop.top)*dwOutputWidth) + i) = *(pSrc + (dwWidth - i - 1) + dwMapPitchPixels*(dwHeight - j - 1));
+		UINT32* pSrc = (UINT32*)map.pBits;
+		UINT32* pDst = (UINT32*)out_buf.data();
+		for (unsigned int j = 0; j<output_height; j++) {
+			for (unsigned int i = 0; i<output_width; i++) {
+				*(pDst + (output_rect.left + (j + output_rect.top)*output_width) + i) = *(pSrc + (output_width - i - 1) + dwMapPitchPixels*(output_height - j - 1));
 			}
 		}
 	}
 	break;
 	case DXGI_MODE_ROTATION_ROTATE270: {
 		// Rotating at 270 degrees
-		DWORD* pSrc = (DWORD*)map.pBits;
-		DWORD* pDst = (DWORD*)buf;
-		for (unsigned int j = 0; j<dwHeight; j++) {
-			for (unsigned int i = 0; i<dwWidth; i++) {
-				*(pDst + (rcDesktop.left + (j + rcDesktop.top)*dwOutputWidth) + i) = *(pSrc + (dwHeight - j - 1) + dwMapPitchPixels*i);
+		UINT32* pSrc = (UINT32*)map.pBits;
+		UINT32* pDst = (UINT32*)out_buf.data();
+		for (unsigned int j = 0; j<output_height; j++) {
+			for (unsigned int i = 0; i<output_width; i++) {
+				*(pDst + (output_rect.left + (j + output_rect.top)*output_width) + i) = *(pSrc + (output_height - j - 1) + dwMapPitchPixels*i);
 			}
 		}
 	}
@@ -240,7 +231,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 
 	surface->Unmap();
 
-	output.release_frame();
+	output_dup.release_frame();
 
 	return out_buf;
 }
