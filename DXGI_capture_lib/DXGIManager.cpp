@@ -48,7 +48,7 @@ DXGI_OUTPUT_DESC DuplicatedOutput::get_desc() {
 HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** out_surface) {
 	DXGI_OUTDUPL_FRAME_INFO frame_info;
 	CComPtr<IDXGIResource> frame_resource;
-	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(20, &frame_info, &frame_resource));
+	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(50, &frame_info, &frame_resource));
 
 	CComQIPtr<ID3D11Texture2D> frame_texture = frame_resource;
 	D3D11_TEXTURE2D_DESC texture_desc;
@@ -76,16 +76,12 @@ void DuplicatedOutput::release_frame() {
 }
 
 bool DuplicatedOutput::is_primary() {
-	DXGI_OUTPUT_DESC outdesc;
-	m_output->GetDesc(&outdesc);
+	DXGI_OUTPUT_DESC output_desc;
+	m_output->GetDesc(&output_desc);
+	MONITORINFO monitor_info;
+	GetMonitorInfo(output_desc.Monitor, &monitor_info);
 
-	MONITORINFO mi;
-	mi.cbSize = sizeof(MONITORINFO);
-	GetMonitorInfo(outdesc.Monitor, &mi);
-	if (mi.dwFlags & MONITORINFOF_PRIMARY) {
-		return true;
-	}
-	return false;
+	return monitor_info.dwFlags & MONITORINFOF_PRIMARY;
 }
 
 DXGIManager::DXGIManager(): m_capture_source(0) {
@@ -123,51 +119,44 @@ void DXGIManager::init() {
 	// Iterating over all adapters to get all outputs
 	for (auto& adapter : adapters) {
 		vector<CComPtr<IDXGIOutput>> outputs = get_adapter_outputs(adapter);
-
 		if (outputs.size() == 0) {
 			continue;
 		}
 
 		// Creating device for each adapter that has the output
-		CComPtr<ID3D11Device> spD3D11Device;
-		CComPtr<ID3D11DeviceContext> spD3D11DeviceContext;
-		D3D_FEATURE_LEVEL fl = D3D_FEATURE_LEVEL_9_1;
+		CComPtr<ID3D11Device> d3d11_device;
+		CComPtr<ID3D11DeviceContext> device_context;
+		D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_9_1;
 		TRY_EXCEPT(D3D11CreateDevice(adapter,
 			D3D_DRIVER_TYPE_UNKNOWN,
 			NULL, 0, NULL, 0,
 			D3D11_SDK_VERSION,
-			&spD3D11Device,
-			&fl,
-			&spD3D11DeviceContext));
+			&d3d11_device,
+			&feature_level,
+			&device_context));
 
 		for (CComQIPtr<IDXGIOutput1> output : outputs) {
-			CComQIPtr<IDXGIDevice1> spDXGIDevice = spD3D11Device;
-			if (!output || !spDXGIDevice) {
-				continue;
-			}
+			CComQIPtr<IDXGIDevice1> dxgi_device = d3d11_device;
 
-			CComPtr<IDXGIOutputDuplication> spDuplicatedOutput;
-			HRESULT hr = output->DuplicateOutput(spDXGIDevice, &spDuplicatedOutput);
+			CComPtr<IDXGIOutputDuplication> duplicated_output;
+			HRESULT hr = output->DuplicateOutput(dxgi_device, &duplicated_output);
 			if (FAILED(hr)) {
 				continue;
 			}
 
 			m_out_dups.push_back(
-				DuplicatedOutput(spD3D11Device,
-					spD3D11DeviceContext,
+				DuplicatedOutput(d3d11_device,
+					device_context,
 					output,
-					spDuplicatedOutput));
+					duplicated_output));
 		}
 	}
-
-	return;
 }
 
 RECT DXGIManager::get_output_rect() {
 	DuplicatedOutput output = get_output_duplication();
-	DXGI_OUTPUT_DESC outDesc = output.get_desc();
-
-	return outDesc.DesktopCoordinates;
+	DXGI_OUTPUT_DESC output_desc = output.get_desc();
+	return output_desc.DesktopCoordinates;
 }
 
 vector<BYTE> DXGIManager::get_output_data() {
@@ -195,7 +184,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 	case DXGI_MODE_ROTATION_IDENTITY: {
 		// Just copying
 		UINT32 dwStripe = output_width * PIXEL_SIZE;
-		for (unsigned int i = 0; i<output_height; i++) {
+		for (UINT32 i = 0; i<output_height; i++) {
 			memcpy_s(out_buf.data() + (output_rect.left + (i + output_rect.top)*output_width) * 4, dwStripe, map.pBits + i*map.Pitch, dwStripe);
 		}
 	}
@@ -204,8 +193,8 @@ vector<BYTE> DXGIManager::get_output_data() {
 		// Rotating at 90 degrees
 		UINT32* pSrc = (UINT32*)map.pBits;
 		UINT32* pDst = (UINT32*)out_buf.data();
-		for (unsigned int j = 0; j<output_height; j++) {
-			for (unsigned int i = 0; i<output_width; i++) {
+		for (UINT32 j = 0; j<output_height; j++) {
+			for (UINT32 i = 0; i<output_width; i++) {
 				*(pDst + (output_rect.left + (j + output_rect.top)*output_width) + i) = *(pSrc + j + dwMapPitchPixels*(output_width - i - 1));
 			}
 		}
@@ -215,8 +204,8 @@ vector<BYTE> DXGIManager::get_output_data() {
 		// Rotating at 180 degrees
 		UINT32* pSrc = (UINT32*)map.pBits;
 		UINT32* pDst = (UINT32*)out_buf.data();
-		for (unsigned int j = 0; j<output_height; j++) {
-			for (unsigned int i = 0; i<output_width; i++) {
+		for (UINT32 j = 0; j<output_height; j++) {
+			for (UINT32 i = 0; i<output_width; i++) {
 				*(pDst + (output_rect.left + (j + output_rect.top)*output_width) + i) = *(pSrc + (output_width - i - 1) + dwMapPitchPixels*(output_height - j - 1));
 			}
 		}
@@ -226,8 +215,8 @@ vector<BYTE> DXGIManager::get_output_data() {
 		// Rotating at 270 degrees
 		UINT32* pSrc = (UINT32*)map.pBits;
 		UINT32* pDst = (UINT32*)out_buf.data();
-		for (unsigned int j = 0; j<output_height; j++) {
-			for (unsigned int i = 0; i<output_width; i++) {
+		for (UINT32 j = 0; j<output_height; j++) {
+			for (UINT32 i = 0; i<output_width; i++) {
 				*(pDst + (output_rect.left + (j + output_rect.top)*output_width) + i) = *(pSrc + (output_height - j - 1) + dwMapPitchPixels*i);
 			}
 		}
