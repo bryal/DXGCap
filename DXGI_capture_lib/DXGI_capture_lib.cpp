@@ -21,26 +21,24 @@ int main(int argc, _TCHAR* argv[]) {
 	CComPtr<IWICImagingFactory> spWICFactory;
 	TRY_RETURN(spWICFactory.CoCreateInstance(CLSID_WICImagingFactory));
 
-	// Benchmark
-	for (UINT32 bm = 0; bm < 1200; bm++) {
-
 	vector<BYTE> buf;
 	HRESULT hr = S_OK;
-	do {
-		try {
-			buf = dxgi_manager.get_output_data();
-			hr = S_OK;
-		} catch (HRESULT e) {
-			hr = e;
+	// Benchmark
+	for (int j = 0; j < 240; j++) {
+		do {
+			try {
+				buf = dxgi_manager.get_output_data();
+				hr = S_OK;
+			} catch (HRESULT e) {
+				hr = e;
+			}
+		} while (hr == DXGI_ERROR_WAIT_TIMEOUT);
+		if (FAILED(hr)) {
+			printf("get_output_data failed with hr=0x%08x\n", hr);
+			return hr;
 		}
-	} while (hr == DXGI_ERROR_WAIT_TIMEOUT);
-	if (FAILED(hr)) {
-		printf("get_output_data failed with hr=0x%08x\n", hr);
-		return hr;
 	}
-
-	}
-
+	
 	/*
 	printf("Saving capture to file\n");
 

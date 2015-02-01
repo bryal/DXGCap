@@ -1,3 +1,10 @@
+// DXGI_capture_lib.cpp : The entry point for the application.
+//
+// NOTES:
+// The first time that `AcquireNextFrame` is called, the resulting frame is very likely to be all
+// black, with no error. Following frames are not though. Why? I don't know. However, since this lib
+// will not just take a single screenshot, but rather stream the screen, this doesn't really matter.
+
 #include "DXGIManager.hpp"
 #include <functional>
 
@@ -49,7 +56,7 @@ DXGI_OUTPUT_DESC DuplicatedOutput::get_desc() {
 HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** out_surface) {
 	DXGI_OUTDUPL_FRAME_INFO frame_info;
 	CComPtr<IDXGIResource> frame_resource;
-	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(20, &frame_info, &frame_resource));
+	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(50, &frame_info, &frame_resource));
 
 	CComQIPtr<ID3D11Texture2D> frame_texture = frame_resource;
 	D3D11_TEXTURE2D_DESC texture_desc;
@@ -178,7 +185,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 	TRY_EXCEPT(output_dup.acquire_next_frame(&frame_surface));
 
 	DXGI_MAPPED_RECT mapped_surface;
-	frame_surface->Map(&mapped_surface, DXGI_MAP_READ);
+	TRY_EXCEPT(frame_surface->Map(&mapped_surface, DXGI_MAP_READ));
 
 	// Set origin of `output_rect` to (0, 0)
 	OffsetRect(&output_rect, -output_rect.left, -output_rect.top);
@@ -189,6 +196,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 	// Get address offset for source pixel from destination row and column
 	// Order: 90deg, 180, 270
 	std::function<UINT32(UINT32, UINT32)> ofsetters [] = {
+		// [&](UINT32 row, UINT32 col) { return row * map_pitch_n_pixels + col; },
 		[&](UINT32 row, UINT32 col) { return (output_width-1-col) * map_pitch_n_pixels; },
 		[&](UINT32 row, UINT32 col) {
 			return (output_height-1-row) * map_pitch_n_pixels + (output_width-col-1); },
@@ -215,7 +223,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 			}
 		}
 	} else {
-		throw 1;
+		throw -1;
 	}
 
 	frame_surface->Unmap();
