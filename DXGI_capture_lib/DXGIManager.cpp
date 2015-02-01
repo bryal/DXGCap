@@ -2,6 +2,34 @@
 
 // TODO: add tests!!
 
+
+vector<CComPtr<IDXGIOutput>> get_adapter_outputs(IDXGIAdapter1* adapter) {
+	vector<CComPtr<IDXGIOutput>> out_vec;
+	for (UINT16 i = 0; ; i++) {
+		CComPtr<IDXGIOutput> output;
+		HRESULT hr = adapter->EnumOutputs(i, &output);
+		if (FAILED(hr)) {
+			break;
+		}
+
+		DXGI_OUTPUT_DESC out_desc;
+		output->GetDesc(&out_desc);
+		if (out_desc.AttachedToDesktop) {
+			out_vec.push_back(output);
+		}
+
+		printf("Display output found. Device:%ls Rotation:%d Coordinates:(%d,%d) (%d,%d)\n",
+			out_desc.DeviceName,
+			out_desc.Rotation,
+			out_desc.DesktopCoordinates.left, out_desc.DesktopCoordinates.top,
+			out_desc.DesktopCoordinates.right, out_desc.DesktopCoordinates.bottom);
+
+		output.Release();
+	}
+
+	return out_vec;
+}
+
 DuplicatedOutput::DuplicatedOutput(ID3D11Device* device,
 	ID3D11DeviceContext* context,
 	IDXGIOutput1* output,
@@ -84,40 +112,19 @@ void DXGIManager::init() {
 	TRY_EXCEPT(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&factory)));
 
 	// Getting all adapters
-	vector<CComPtr<IDXGIAdapter1>> vAdapters;
+	vector<CComPtr<IDXGIAdapter1>> adapters;
 
 	CComPtr<IDXGIAdapter1> spAdapter;
-	for (int i = 0; factory->EnumAdapters1(i, &spAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
-		vAdapters.push_back(spAdapter);
+	for (UINT16 i = 0; factory->EnumAdapters1(i, &spAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
+		adapters.push_back(spAdapter);
 		spAdapter.Release();
 	}
 
 	// Iterating over all adapters to get all outputs
-	for (auto AdapterIter = vAdapters.begin(); AdapterIter != vAdapters.end(); AdapterIter++) {
-		vector<CComPtr<IDXGIOutput>> vOutputs;
+	for (auto& adapter : adapters) {
+		vector<CComPtr<IDXGIOutput>> outputs = get_adapter_outputs(adapter);
 
-		CComPtr<IDXGIOutput> spDXGIOutput;
-		for (int i = 0; (*AdapterIter)->EnumOutputs(i, &spDXGIOutput) != DXGI_ERROR_NOT_FOUND; i++) {
-			DXGI_OUTPUT_DESC outputDesc;
-			spDXGIOutput->GetDesc(&outputDesc);
-
-			printf("Display output found. DeviceName=%ls  AttachedToDesktop=%d Rotation=%d DesktopCoordinates={(%d,%d),(%d,%d)}\n",
-				outputDesc.DeviceName,
-				outputDesc.AttachedToDesktop,
-				outputDesc.Rotation,
-				outputDesc.DesktopCoordinates.left,
-				outputDesc.DesktopCoordinates.top,
-				outputDesc.DesktopCoordinates.right,
-				outputDesc.DesktopCoordinates.bottom);
-
-			if (outputDesc.AttachedToDesktop) {
-				vOutputs.push_back(spDXGIOutput);
-			}
-
-			spDXGIOutput.Release();
-		}
-
-		if (vOutputs.size() == 0) {
+		if (outputs.size() == 0) {
 			continue;
 		}
 
@@ -125,7 +132,7 @@ void DXGIManager::init() {
 		CComPtr<ID3D11Device> spD3D11Device;
 		CComPtr<ID3D11DeviceContext> spD3D11DeviceContext;
 		D3D_FEATURE_LEVEL fl = D3D_FEATURE_LEVEL_9_1;
-		TRY_EXCEPT(D3D11CreateDevice((*AdapterIter),
+		TRY_EXCEPT(D3D11CreateDevice(adapter,
 			D3D_DRIVER_TYPE_UNKNOWN,
 			NULL, 0, NULL, 0,
 			D3D11_SDK_VERSION,
@@ -133,15 +140,14 @@ void DXGIManager::init() {
 			&fl,
 			&spD3D11DeviceContext));
 
-		for (auto out_it = vOutputs.begin(); out_it != vOutputs.end(); out_it++) {
-			CComQIPtr<IDXGIOutput1> spDXGIOutput1 = *out_it;
+		for (CComQIPtr<IDXGIOutput1> output : outputs) {
 			CComQIPtr<IDXGIDevice1> spDXGIDevice = spD3D11Device;
-			if (!spDXGIOutput1 || !spDXGIDevice) {
+			if (!output || !spDXGIDevice) {
 				continue;
 			}
 
 			CComPtr<IDXGIOutputDuplication> spDuplicatedOutput;
-			HRESULT hr = spDXGIOutput1->DuplicateOutput(spDXGIDevice, &spDuplicatedOutput);
+			HRESULT hr = output->DuplicateOutput(spDXGIDevice, &spDuplicatedOutput);
 			if (FAILED(hr)) {
 				continue;
 			}
@@ -149,7 +155,7 @@ void DXGIManager::init() {
 			m_out_dups.push_back(
 				DuplicatedOutput(spD3D11Device,
 					spD3D11DeviceContext,
-					spDXGIOutput1,
+					output,
 					spDuplicatedOutput));
 		}
 	}

@@ -35,6 +35,8 @@
 using std::vector;
 
 
+vector<CComPtr<IDXGIOutput>> get_adapter_outputs(IDXGIAdapter1* adapter);
+
 class DuplicatedOutput {
 public:
 	DuplicatedOutput(ID3D11Device* device,
