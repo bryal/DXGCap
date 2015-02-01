@@ -5,9 +5,6 @@
 
 
 int main(int argc, _TCHAR* argv[]) {
-	printf("DXGICaptureSample. Fast windows screen capture\n"
-		"Capturing desktop to: capture.bmp\n");
-
 	CoInitialize(NULL);
 
 	DXGIManager dxgi_manager;
@@ -18,17 +15,15 @@ int main(int argc, _TCHAR* argv[]) {
 	UINT32 height = dimensions.bottom - dimensions.top;
 	printf("width=%d height=%d\n", width, height);
 
-	CComPtr<IWICImagingFactory> spWICFactory;
-	TRY_RETURN(spWICFactory.CoCreateInstance(CLSID_WICImagingFactory));
-
 	vector<BYTE> buf;
-	HRESULT hr = S_OK;
 	// Benchmark
-	for (int j = 0; j < 10; j++) {
+	for (UINT32 j = 0; j < 1200; j++) {
+		
+		HRESULT hr = S_OK;
 		do {
+			hr = S_OK;
 			try {
 				buf = dxgi_manager.get_output_data();
-				hr = S_OK;
 			} catch (HRESULT e) {
 				hr = e;
 			}
@@ -40,7 +35,10 @@ int main(int argc, _TCHAR* argv[]) {
 	}
 	
 	/*
-	printf("Saving capture to file\n");
+	printf("Saving capture to capture.bmp\n");
+
+	CComPtr<IWICImagingFactory> spWICFactory;
+	TRY_RETURN(spWICFactory.CoCreateInstance(CLSID_WICImagingFactory));
 
 	CComPtr<IWICBitmap> spBitmap;
 	TRY_RETURN(spWICFactory->CreateBitmapFromMemory(width, height, GUID_WICPixelFormat32bppBGRA, width * 4, buf.size(), (BYTE*)buf.data(), &spBitmap));
@@ -66,6 +64,8 @@ int main(int argc, _TCHAR* argv[]) {
 	TRY_RETURN(hr = spFrame->Commit());
 	TRY_RETURN(hr = spEncoder->Commit());
 	*/
+
+	CoUninitialize();
 
 	return 0;
 }

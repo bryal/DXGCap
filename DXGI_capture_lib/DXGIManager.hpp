@@ -42,8 +42,9 @@ public:
 		ID3D11DeviceContext* context,
 		IDXGIOutput1* output,
 		IDXGIOutputDuplication* output_dup);
+	~DuplicatedOutput();
 	DXGI_OUTPUT_DESC get_desc();
-	HRESULT acquire_next_frame(IDXGISurface1** out_surface);
+	HRESULT get_frame(IDXGISurface1** out_surface);
 	void release_frame();
 	bool is_primary();
 
@@ -64,10 +65,9 @@ public:
 	RECT get_output_rect();
 	vector<BYTE> get_output_data();
 private:
-	
-	DuplicatedOutput get_output_duplication();
+	DuplicatedOutput* get_output_duplication();
+
 	vector<DuplicatedOutput> m_out_dups;
 	UINT16 m_capture_source;
 	RECT m_output_rect;
-	BYTE* m_buf;
 };

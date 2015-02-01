@@ -31,8 +31,6 @@ vector<CComPtr<IDXGIOutput>> get_adapter_outputs(IDXGIAdapter1* adapter) {
 			out_desc.Rotation,
 			out_desc.DesktopCoordinates.left, out_desc.DesktopCoordinates.top,
 			out_desc.DesktopCoordinates.right, out_desc.DesktopCoordinates.bottom);
-
-		output.Release();
 	}
 
 	return out_vec;
@@ -46,6 +44,12 @@ DuplicatedOutput::DuplicatedOutput(ID3D11Device* device,
 		m_device_context(context),
 		m_output(output),
 		m_dxgi_output_dup(output_dup) { }
+DuplicatedOutput::~DuplicatedOutput() {
+	m_device.Release();
+	m_device_context.Release();
+	m_output.Release();
+	m_dxgi_output_dup.Release();
+}
 
 DXGI_OUTPUT_DESC DuplicatedOutput::get_desc() {
 	DXGI_OUTPUT_DESC desc;
@@ -53,16 +57,16 @@ DXGI_OUTPUT_DESC DuplicatedOutput::get_desc() {
 	return desc;
 }
 
-HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** out_surface) {
+HRESULT DuplicatedOutput::get_frame(IDXGISurface1** out_surface) {
 	DXGI_OUTDUPL_FRAME_INFO frame_info;
 	CComPtr<IDXGIResource> frame_resource;
-	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(50, &frame_info, &frame_resource));
+	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(500, &frame_info, &frame_resource));
 
 	CComQIPtr<ID3D11Texture2D> frame_texture = frame_resource;
 	D3D11_TEXTURE2D_DESC texture_desc;
 	frame_texture->GetDesc(&texture_desc);
 
-	// Comfigure the description to make the texture readable
+	// Configure the description to make the texture readable
 	texture_desc.Usage = D3D11_USAGE_STAGING;
 	texture_desc.BindFlags = 0;
 	texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
@@ -97,12 +101,7 @@ DXGIManager::DXGIManager(): m_capture_source(0) {
 	SetRect(&m_output_rect, 0, 0, 0, 0);
 }
 
-DXGIManager::~DXGIManager() {
-	if (m_buf) {
-		delete[] m_buf;
-		m_buf = NULL;
-	}
-}
+DXGIManager::~DXGIManager() { }
 
 void DXGIManager::set_capture_source(UINT16 cs) {
 	m_capture_source = cs;
@@ -117,11 +116,12 @@ HRESULT DXGIManager::init() {
 
 	// Getting all adapters
 	vector<CComPtr<IDXGIAdapter1>> adapters;
-
-	CComPtr<IDXGIAdapter1> spAdapter;
-	for (UINT16 i = 0; factory->EnumAdapters1(i, &spAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
-		adapters.push_back(spAdapter);
-		spAdapter.Release();
+	{
+		CComPtr<IDXGIAdapter1> adapter;
+		for (UINT16 i = 0; factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; i++) {
+			adapters.push_back(adapter);
+			adapter.Release();
+		}
 	}
 
 	// Iterating over all adapters to get all outputs
@@ -164,14 +164,14 @@ HRESULT DXGIManager::init() {
 }
 
 RECT DXGIManager::get_output_rect() {
-	DuplicatedOutput output = get_output_duplication();
-	DXGI_OUTPUT_DESC output_desc = output.get_desc();
+	DuplicatedOutput* output = get_output_duplication();
+	DXGI_OUTPUT_DESC output_desc = output->get_desc();
 	return output_desc.DesktopCoordinates;
 }
 
 vector<BYTE> DXGIManager::get_output_data() {
-	DuplicatedOutput output_dup = get_output_duplication();
-	DXGI_OUTPUT_DESC output_desc = output_dup.get_desc();
+	DuplicatedOutput* output_dup = get_output_duplication();
+	DXGI_OUTPUT_DESC output_desc = output_dup->get_desc();
 	RECT output_rect = output_desc.DesktopCoordinates;
 	UINT32 output_width = output_rect.right - output_rect.left;
 	UINT32 output_height = output_rect.bottom - output_rect.top;
@@ -183,7 +183,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 	out_buf.resize(buf_size);
 
 	CComPtr<IDXGISurface1> frame_surface;
-	TRY_EXCEPT(output_dup.acquire_next_frame(&frame_surface));
+	TRY_EXCEPT(output_dup->get_frame(&frame_surface));
 
 	DXGI_MAPPED_RECT mapped_surface;
 	TRY_EXCEPT(frame_surface->Map(&mapped_surface, DXGI_MAP_READ));
@@ -228,12 +228,12 @@ vector<BYTE> DXGIManager::get_output_data() {
 	}
 
 	frame_surface->Unmap();
-	output_dup.release_frame();
+	output_dup->release_frame();
 
 	return out_buf;
 }
 
-DuplicatedOutput DXGIManager::get_output_duplication() {
+DuplicatedOutput* DXGIManager::get_output_duplication() {
 	auto out_it = m_out_dups.begin();
 	if (m_capture_source == 0) { // Find the primary output
 		for (; out_it != m_out_dups.end(); out_it++) {
@@ -251,5 +251,5 @@ DuplicatedOutput DXGIManager::get_output_duplication() {
 			}
 		}
 	}
-	return *out_it;
+	return &*out_it;
 }
