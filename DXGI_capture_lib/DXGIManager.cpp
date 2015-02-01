@@ -173,7 +173,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 
 	UINT32 buf_size = output_width * output_height * PIXEL_SIZE;
 	vector<BYTE> out_buf;
-	out_buf.reserve(buf_size);
+	out_buf.resize(buf_size); // Required since modifying the raw vector.data() does not change size
 
 	CComPtr<IDXGISurface1> surface;
 	TRY_EXCEPT(output_dup.acquire_next_frame(&surface));
@@ -233,7 +233,6 @@ vector<BYTE> DXGIManager::get_output_data() {
 
 	output_dup.release_frame();
 
-	out_buf.resize(buf_size); // Required since modifying the raw vector.data() does not change size
 	return out_buf;
 }
 
