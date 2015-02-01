@@ -11,7 +11,7 @@ int main(int argc, _TCHAR* argv[]) {
 	CoInitialize(NULL);
 
 	DXGIManager dxgi_manager;
-	dxgi_manager.set_capture_source(1);
+	dxgi_manager.set_capture_source(0);
 
 	RECT dimensions = dxgi_manager.get_output_rect();
 	UINT32 width = dimensions.right - dimensions.left;
@@ -21,22 +21,27 @@ int main(int argc, _TCHAR* argv[]) {
 	CComPtr<IWICImagingFactory> spWICFactory;
 	TRY_RETURN(spWICFactory.CoCreateInstance(CLSID_WICImagingFactory));
 
+	// Benchmark
+	for (UINT32 bm = 0; bm < 1200; bm++) {
+
 	vector<BYTE> buf;
 	HRESULT hr = S_OK;
-	UINT8 i = 0;
 	do {
 		try {
 			buf = dxgi_manager.get_output_data();
+			hr = S_OK;
 		} catch (HRESULT e) {
 			hr = e;
 		}
-		i++;
-	} while (hr == DXGI_ERROR_WAIT_TIMEOUT || i < 2);
+	} while (hr == DXGI_ERROR_WAIT_TIMEOUT);
 	if (FAILED(hr)) {
 		printf("get_output_data failed with hr=0x%08x\n", hr);
 		return hr;
 	}
 
+	}
+
+	/*
 	printf("Saving capture to file\n");
 
 	CComPtr<IWICBitmap> spBitmap;
@@ -62,6 +67,7 @@ int main(int argc, _TCHAR* argv[]) {
 	TRY_RETURN(hr = spFrame->WriteSource(spBitmap, NULL));
 	TRY_RETURN(hr = spFrame->Commit());
 	TRY_RETURN(hr = spEncoder->Commit());
+	*/
 
 	return 0;
 }

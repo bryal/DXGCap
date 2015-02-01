@@ -13,13 +13,13 @@
 
 // The default format of B8G8R8A8 gives a pixel-size of 4 bytes
 #define PIXEL_SIZE 4
+#define PIXEL UINT32
 
-// `printf`s in below are for debugging purposes
+// printf(#expr " failed with error: %x\n", e); use for debugging
 // Try performing the expression with return type HRESULT. If the result is a failure, return it.
 #define TRY_RETURN(expr) { \
 	HRESULT e = expr; \
 	if (FAILED(e)) { \
-		printf(#expr " failed with error: %x\n", e); \
 		return e; \
 	} \
 }
@@ -27,7 +27,6 @@
 #define TRY_EXCEPT(expr) { \
 	HRESULT e = expr; \
 	if (FAILED(e)) { \
-		printf(#expr " failed with error: %x\n", e); \
 		throw e; \
 	} \
 }

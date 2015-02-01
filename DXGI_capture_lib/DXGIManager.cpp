@@ -1,4 +1,5 @@
 #include "DXGIManager.hpp"
+#include <functional>
 
 // TODO: add tests!!
 
@@ -48,7 +49,7 @@ DXGI_OUTPUT_DESC DuplicatedOutput::get_desc() {
 HRESULT DuplicatedOutput::acquire_next_frame(IDXGISurface1** out_surface) {
 	DXGI_OUTDUPL_FRAME_INFO frame_info;
 	CComPtr<IDXGIResource> frame_resource;
-	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(50, &frame_info, &frame_resource));
+	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(20, &frame_info, &frame_resource));
 
 	CComQIPtr<ID3D11Texture2D> frame_texture = frame_resource;
 	D3D11_TEXTURE2D_DESC texture_desc;
@@ -168,65 +169,56 @@ vector<BYTE> DXGIManager::get_output_data() {
 	UINT32 output_height = output_rect.bottom - output_rect.top;
 
 	UINT32 buf_size = output_width * output_height * PIXEL_SIZE;
+
 	vector<BYTE> out_buf;
-	out_buf.resize(buf_size); // Required since modifying the raw vector.data() does not change size
+	// Required since modifying the raw vector.data() does not change size
+	out_buf.resize(buf_size);
 
-	CComPtr<IDXGISurface1> surface;
-	TRY_EXCEPT(output_dup.acquire_next_frame(&surface));
+	CComPtr<IDXGISurface1> frame_surface;
+	TRY_EXCEPT(output_dup.acquire_next_frame(&frame_surface));
 
-	DXGI_MAPPED_RECT map;
-	surface->Map(&map, DXGI_MAP_READ);
+	DXGI_MAPPED_RECT mapped_surface;
+	frame_surface->Map(&mapped_surface, DXGI_MAP_READ);
 
+	// Set origin of `output_rect` to (0, 0)
 	OffsetRect(&output_rect, -output_rect.left, -output_rect.top);
 
-	UINT32 dwMapPitchPixels = map.Pitch / PIXEL_SIZE;
+	// The Pitch may contain padding, wherefore this is not necessarily pixels per row
+	UINT32 map_pitch_n_pixels = mapped_surface.Pitch / PIXEL_SIZE;
 
-	switch (output_desc.Rotation) {
-	case DXGI_MODE_ROTATION_IDENTITY: {
-		// Just copying
-		UINT32 dwStripe = output_width * PIXEL_SIZE;
-		for (UINT32 i = 0; i<output_height; i++) {
-			memcpy_s(out_buf.data() + (output_rect.left + (i + output_rect.top)*output_width) * 4, dwStripe, map.pBits + i*map.Pitch, dwStripe);
+	// Get address offset for source pixel from destination row and column
+	// Order: 90deg, 180, 270
+	std::function<UINT32(UINT32, UINT32)> ofsetters [] = {
+		[&](UINT32 row, UINT32 col) { return (output_width-1-col) * map_pitch_n_pixels; },
+		[&](UINT32 row, UINT32 col) {
+			return (output_height-1-row) * map_pitch_n_pixels + (output_width-col-1); },
+		[&](UINT32 row, UINT32 col) {
+			return col * map_pitch_n_pixels + (output_height-row-1); }};
+
+	if (output_desc.Rotation == DXGI_MODE_ROTATION_IDENTITY) {
+		// Plain copy by byte
+		BYTE* out_buf_data = out_buf.data();
+		UINT32 out_row_size = output_width * PIXEL_SIZE;
+		for (UINT32 row_n = 0; row_n < output_height; row_n++) {
+			memcpy(out_buf_data + row_n * out_row_size,
+				mapped_surface.pBits + row_n * mapped_surface.Pitch,
+				out_row_size);
 		}
-	}
-	break;
-	case DXGI_MODE_ROTATION_ROTATE90: {
-		// Rotating at 90 degrees
-		UINT32* pSrc = (UINT32*)map.pBits;
-		UINT32* pDst = (UINT32*)out_buf.data();
-		for (UINT32 j = 0; j<output_height; j++) {
-			for (UINT32 i = 0; i<output_width; i++) {
-				*(pDst + (output_rect.left + (j + output_rect.top)*output_width) + i) = *(pSrc + j + dwMapPitchPixels*(output_width - i - 1));
+	} else if (output_desc.Rotation != DXGI_MODE_ROTATION_UNSPECIFIED) {
+		auto& ofsetter = ofsetters[output_desc.Rotation - 2]; // 90deg = 2 -> 0
+		PIXEL* src_pixels = (PIXEL*)mapped_surface.pBits;
+		PIXEL* dest_pixels = (PIXEL*)out_buf.data();
+		for (UINT32 dst_row = 0; dst_row < output_height; dst_row++) {
+			for (UINT32 dst_col = 0; dst_col < output_width; dst_col ++) {
+				*(dest_pixels + dst_row * output_width + dst_col) =
+					*(src_pixels + ofsetter(dst_row, dst_col));
 			}
 		}
-	}
-	break;
-	case DXGI_MODE_ROTATION_ROTATE180: {
-		// Rotating at 180 degrees
-		UINT32* pSrc = (UINT32*)map.pBits;
-		UINT32* pDst = (UINT32*)out_buf.data();
-		for (UINT32 j = 0; j<output_height; j++) {
-			for (UINT32 i = 0; i<output_width; i++) {
-				*(pDst + (output_rect.left + (j + output_rect.top)*output_width) + i) = *(pSrc + (output_width - i - 1) + dwMapPitchPixels*(output_height - j - 1));
-			}
-		}
-	}
-	break;
-	case DXGI_MODE_ROTATION_ROTATE270: {
-		// Rotating at 270 degrees
-		UINT32* pSrc = (UINT32*)map.pBits;
-		UINT32* pDst = (UINT32*)out_buf.data();
-		for (UINT32 j = 0; j<output_height; j++) {
-			for (UINT32 i = 0; i<output_width; i++) {
-				*(pDst + (output_rect.left + (j + output_rect.top)*output_width) + i) = *(pSrc + (output_height - j - 1) + dwMapPitchPixels*i);
-			}
-		}
-	}
-	break;
+	} else {
+		throw 1;
 	}
 
-	surface->Unmap();
-
+	frame_surface->Unmap();
 	output_dup.release_frame();
 
 	return out_buf;
