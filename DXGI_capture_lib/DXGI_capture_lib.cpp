@@ -11,7 +11,7 @@ int main(int argc, _TCHAR* argv[]) {
 	CoInitialize(NULL);
 
 	DXGIManager dxgi_manager;
-	dxgi_manager.set_capture_source(0);
+	dxgi_manager.init();
 
 	RECT dimensions = dxgi_manager.get_output_rect();
 	UINT32 width = dimensions.right - dimensions.left;
@@ -24,7 +24,7 @@ int main(int argc, _TCHAR* argv[]) {
 	vector<BYTE> buf;
 	HRESULT hr = S_OK;
 	// Benchmark
-	for (int j = 0; j < 240; j++) {
+	for (int j = 0; j < 10; j++) {
 		do {
 			try {
 				buf = dxgi_manager.get_output_data();

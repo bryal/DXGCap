@@ -58,14 +58,14 @@ class DXGIManager {
 public:
 	DXGIManager();
 	~DXGIManager();
+	HRESULT init();
 	void set_capture_source(UINT16 cs);
 	UINT16 get_capture_source();
 	RECT get_output_rect();
 	vector<BYTE> get_output_data();
 private:
-	void init();
-	DuplicatedOutput get_output_duplication();
 	
+	DuplicatedOutput get_output_duplication();
 	vector<DuplicatedOutput> m_out_dups;
 	UINT16 m_capture_source;
 	RECT m_output_rect;

@@ -95,7 +95,6 @@ bool DuplicatedOutput::is_primary() {
 
 DXGIManager::DXGIManager(): m_capture_source(0) {
 	SetRect(&m_output_rect, 0, 0, 0, 0);
-	init();
 }
 
 DXGIManager::~DXGIManager() {
@@ -112,9 +111,9 @@ UINT16 DXGIManager::get_capture_source() {
 	return m_capture_source;
 }
 
-void DXGIManager::init() {
+HRESULT DXGIManager::init() {
 	CComPtr<IDXGIFactory1> factory;
-	TRY_EXCEPT(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&factory)));
+	TRY_RETURN(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&factory)));
 
 	// Getting all adapters
 	vector<CComPtr<IDXGIAdapter1>> adapters;
@@ -136,7 +135,7 @@ void DXGIManager::init() {
 		CComPtr<ID3D11Device> d3d11_device;
 		CComPtr<ID3D11DeviceContext> device_context;
 		D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_9_1;
-		TRY_EXCEPT(D3D11CreateDevice(adapter,
+		TRY_RETURN(D3D11CreateDevice(adapter,
 			D3D_DRIVER_TYPE_UNKNOWN,
 			NULL, 0, NULL, 0,
 			D3D11_SDK_VERSION,
@@ -160,6 +159,8 @@ void DXGIManager::init() {
 					duplicated_output));
 		}
 	}
+
+	return S_OK;
 }
 
 RECT DXGIManager::get_output_rect() {
