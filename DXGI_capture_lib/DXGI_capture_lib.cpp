@@ -44,6 +44,7 @@ extern "C" {
 	}
 }
 
+/*
 int main(int argc, _TCHAR* argv[]) {
 	init();
 
@@ -58,9 +59,8 @@ int main(int argc, _TCHAR* argv[]) {
 		free(buf);
 	}
 
-	delete_dxgi_manager(dxgi_manager);
+	get_frame_bytes(dxgi_manager, &buf_size, &buf);
 	
-	/*
 	printf("Saving capture to capture.bmp\n");
 
 	CComPtr<IWICImagingFactory> spWICFactory;
@@ -89,7 +89,10 @@ int main(int argc, _TCHAR* argv[]) {
 	TRY_RETURN(spFrame->WriteSource(spBitmap, NULL));
 	TRY_RETURN(spFrame->Commit());
 	TRY_RETURN(spEncoder->Commit());
-	*/
+
+	free(buf);
+	delete_dxgi_manager(dxgi_manager);
 
 	return 0;
 }
+*/
