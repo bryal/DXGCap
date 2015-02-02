@@ -4,20 +4,42 @@
 #include "DXGIManager.hpp"
 
 
+// C ABI
+extern "C" {
+	void init() {
+		CoInitialize(NULL);
+	}
+
+	void* create_dxgi_manager() {
+		DXGIManager* dxgi_manager = new DXGIManager();
+		dxgi_manager->setup();
+		return (void*)dxgi_manager;
+	}
+	void delete_dxgi_manager(void* dxgi_manager) {
+		free((DXGIManager*)(dxgi_manager));
+	}
+
+	void get_output_dimensions(void* dxgi_manager, uint32_t* width, uint32_t* height) {
+		RECT dimensions = ((DXGIManager*)dxgi_manager)->get_output_rect();
+		*width = dimensions.right - dimensions.left;
+		*height = dimensions.bottom - dimensions.top;
+	}
+}
+
 int main(int argc, _TCHAR* argv[]) {
 	CoInitialize(NULL);
 
 	DXGIManager dxgi_manager;
-	dxgi_manager.init();
+	dxgi_manager.setup();
 
 	RECT dimensions = dxgi_manager.get_output_rect();
-	UINT32 width = dimensions.right - dimensions.left;
-	UINT32 height = dimensions.bottom - dimensions.top;
+	uint32_t width = dimensions.right - dimensions.left;
+	uint32_t height = dimensions.bottom - dimensions.top;
 	printf("width=%d height=%d\n", width, height);
 
-	vector<BYTE> buf;
 	// Benchmark
-	for (UINT32 j = 0; j < 1200; j++) {
+	vector<BYTE> buf;
+	for (UINT32 j = 0; j < 2400; j++) {
 		
 		HRESULT hr = S_OK;
 		do {
@@ -34,7 +56,7 @@ int main(int argc, _TCHAR* argv[]) {
 		}
 	}
 	
-	/*
+	
 	printf("Saving capture to capture.bmp\n");
 
 	CComPtr<IWICImagingFactory> spWICFactory;
@@ -59,13 +81,11 @@ int main(int argc, _TCHAR* argv[]) {
 
 	WICPixelFormatGUID format;
 	TRY_RETURN(spBitmap->GetPixelFormat(&format));
-	TRY_RETURN(hr = spFrame->SetPixelFormat(&format));
-	TRY_RETURN(hr = spFrame->WriteSource(spBitmap, NULL));
-	TRY_RETURN(hr = spFrame->Commit());
-	TRY_RETURN(hr = spEncoder->Commit());
-	*/
-
-	CoUninitialize();
+	TRY_RETURN(spFrame->SetPixelFormat(&format));
+	TRY_RETURN(spFrame->WriteSource(spBitmap, NULL));
+	TRY_RETURN(spFrame->Commit());
+	TRY_RETURN(spEncoder->Commit());
+	
 
 	return 0;
 }

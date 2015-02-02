@@ -13,7 +13,7 @@
 
 // The default format of B8G8R8A8 gives a pixel-size of 4 bytes
 #define PIXEL_SIZE 4
-#define PIXEL UINT32
+#define PIXEL uint32_t
 
 // printf(#expr " failed with error: %x\n", e); use for debugging
 // Try performing the expression with return type HRESULT. If the result is a failure, return it.
@@ -59,7 +59,8 @@ class DXGIManager {
 public:
 	DXGIManager();
 	~DXGIManager();
-	HRESULT init();
+	HRESULT setup();
+	void update();
 	void set_capture_source(UINT16 cs);
 	UINT16 get_capture_source();
 	RECT get_output_rect();
@@ -67,6 +68,7 @@ public:
 private:
 	DuplicatedOutput* get_output_duplication();
 
+	DuplicatedOutput* m_output_duplication;
 	vector<DuplicatedOutput> m_out_dups;
 	UINT16 m_capture_source;
 	RECT m_output_rect;

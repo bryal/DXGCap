@@ -105,12 +105,13 @@ DXGIManager::~DXGIManager() { }
 
 void DXGIManager::set_capture_source(UINT16 cs) {
 	m_capture_source = cs;
+	update();
 }
 UINT16 DXGIManager::get_capture_source() {
 	return m_capture_source;
 }
 
-HRESULT DXGIManager::init() {
+HRESULT DXGIManager::setup() {
 	CComPtr<IDXGIFactory1> factory;
 	TRY_RETURN(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)(&factory)));
 
@@ -160,30 +161,38 @@ HRESULT DXGIManager::init() {
 		}
 	}
 
+	update();
+
 	return S_OK;
 }
 
+void DXGIManager::update() {
+	m_output_duplication = get_output_duplication();
+}
+
 RECT DXGIManager::get_output_rect() {
-	DuplicatedOutput* output = get_output_duplication();
-	DXGI_OUTPUT_DESC output_desc = output->get_desc();
+	DXGI_OUTPUT_DESC output_desc = m_output_duplication->get_desc();
 	return output_desc.DesktopCoordinates;
 }
 
 vector<BYTE> DXGIManager::get_output_data() {
-	DuplicatedOutput* output_dup = get_output_duplication();
-	DXGI_OUTPUT_DESC output_desc = output_dup->get_desc();
+	DXGI_OUTPUT_DESC output_desc = m_output_duplication->get_desc();
 	RECT output_rect = output_desc.DesktopCoordinates;
-	UINT32 output_width = output_rect.right - output_rect.left;
-	UINT32 output_height = output_rect.bottom - output_rect.top;
+	uint32_t output_width = output_rect.right - output_rect.left;
+	uint32_t output_height = output_rect.bottom - output_rect.top;
 
-	UINT32 buf_size = output_width * output_height * PIXEL_SIZE;
+	uint32_t buf_size = output_width * output_height * PIXEL_SIZE;
 
 	vector<BYTE> out_buf;
 	// Required since modifying the raw vector.data() does not change size
 	out_buf.resize(buf_size);
 
 	CComPtr<IDXGISurface1> frame_surface;
-	TRY_EXCEPT(output_dup->get_frame(&frame_surface));
+	HRESULT hr = m_output_duplication->get_frame(&frame_surface);
+	if (FAILED(hr)) {
+		m_output_duplication->release_frame();
+		throw hr;
+	}
 
 	DXGI_MAPPED_RECT mapped_surface;
 	TRY_EXCEPT(frame_surface->Map(&mapped_surface, DXGI_MAP_READ));
@@ -192,23 +201,23 @@ vector<BYTE> DXGIManager::get_output_data() {
 	OffsetRect(&output_rect, -output_rect.left, -output_rect.top);
 
 	// The Pitch may contain padding, wherefore this is not necessarily pixels per row
-	UINT32 map_pitch_n_pixels = mapped_surface.Pitch / PIXEL_SIZE;
+	uint32_t map_pitch_n_pixels = mapped_surface.Pitch / PIXEL_SIZE;
 
 	// Get address offset for source pixel from destination row and column
 	// Order: 90deg, 180, 270
-	std::function<UINT32(UINT32, UINT32)> ofsetters [] = {
-		// [&](UINT32 row, UINT32 col) { return row * map_pitch_n_pixels + col; },
-		[&](UINT32 row, UINT32 col) { return (output_width-1-col) * map_pitch_n_pixels; },
-		[&](UINT32 row, UINT32 col) {
+	std::function<uint32_t(uint32_t, uint32_t)> ofsetters [] = {
+		// [&](uint32_t row, uint32_t col) { return row * map_pitch_n_pixels + col; },
+		[&](uint32_t row, uint32_t col) { return (output_width-1-col) * map_pitch_n_pixels; },
+		[&](uint32_t row, uint32_t col) {
 			return (output_height-1-row) * map_pitch_n_pixels + (output_width-col-1); },
-		[&](UINT32 row, UINT32 col) {
+		[&](uint32_t row, uint32_t col) {
 			return col * map_pitch_n_pixels + (output_height-row-1); }};
 
 	if (output_desc.Rotation == DXGI_MODE_ROTATION_IDENTITY) {
 		// Plain copy by byte
 		BYTE* out_buf_data = out_buf.data();
-		UINT32 out_row_size = output_width * PIXEL_SIZE;
-		for (UINT32 row_n = 0; row_n < output_height; row_n++) {
+		uint32_t out_row_size = output_width * PIXEL_SIZE;
+		for (uint32_t row_n = 0; row_n < output_height; row_n++) {
 			memcpy(out_buf_data + row_n * out_row_size,
 				mapped_surface.pBits + row_n * mapped_surface.Pitch,
 				out_row_size);
@@ -217,8 +226,8 @@ vector<BYTE> DXGIManager::get_output_data() {
 		auto& ofsetter = ofsetters[output_desc.Rotation - 2]; // 90deg = 2 -> 0
 		PIXEL* src_pixels = (PIXEL*)mapped_surface.pBits;
 		PIXEL* dest_pixels = (PIXEL*)out_buf.data();
-		for (UINT32 dst_row = 0; dst_row < output_height; dst_row++) {
-			for (UINT32 dst_col = 0; dst_col < output_width; dst_col ++) {
+		for (uint32_t dst_row = 0; dst_row < output_height; dst_row++) {
+			for (uint32_t dst_col = 0; dst_col < output_width; dst_col ++) {
 				*(dest_pixels + dst_row * output_width + dst_col) =
 					*(src_pixels + ofsetter(dst_row, dst_col));
 			}
@@ -228,7 +237,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 	}
 
 	frame_surface->Unmap();
-	output_dup->release_frame();
+	m_output_duplication->release_frame();
 
 	return out_buf;
 }
@@ -245,7 +254,7 @@ DuplicatedOutput* DXGIManager::get_output_duplication() {
 		if (out_it->is_primary()) {
 			out_it++;
 		}
-		for (UINT32 i = 1; out_it != m_out_dups.end(); i++, out_it++) {
+		for (uint32_t i = 1; out_it != m_out_dups.end(); i++, out_it++) {
 			if (i >= m_capture_source && !out_it->is_primary()) {
 				break;
 			}
