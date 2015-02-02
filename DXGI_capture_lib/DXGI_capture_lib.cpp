@@ -16,7 +16,8 @@ extern "C" {
 		return (void*)dxgi_manager;
 	}
 	void delete_dxgi_manager(void* dxgi_manager) {
-		free((DXGIManager*)(dxgi_manager));
+		DXGIManager* m = (DXGIManager*)(dxgi_manager);
+		delete m;
 	}
 
 	void get_output_dimensions(void* dxgi_manager, uint32_t* width, uint32_t* height) {
@@ -25,7 +26,7 @@ extern "C" {
 		*height = dimensions.bottom - dimensions.top;
 	}
 
-	bool get_frame_buffer(void* dxgi_manager, uint8_t* o_size, uint8_t** o_bytes) {
+	bool get_frame_bytes(void* dxgi_manager, uint32_t* o_size, uint8_t** o_bytes) {
 		HRESULT hr;
 		do {
 			hr = S_OK;
@@ -46,51 +47,20 @@ extern "C" {
 int main(int argc, _TCHAR* argv[]) {
 	CoInitialize(NULL);
 
-	DXGIManager dxgi_manager;
-	dxgi_manager.setup();
+	auto dxgi_manager = create_dxgi_manager();
+	// uint32_t width, height;
+	// get_output_dimensions(dxgi_manager, &width, &height);
 
-	RECT dimensions = dxgi_manager.get_output_rect();
-	uint32_t width = dimensions.right - dimensions.left;
-	uint32_t height = dimensions.bottom - dimensions.top;
-	printf("width=%d height=%d\n", width, height);
-
-	// Benchmark
-	//for (UINT32 j = 0; j < 60; j++) {
-		BYTE* buf;
-		size_t buf_size;
-		HRESULT hr = S_OK;
-		do {
-			hr = S_OK;
-			try {
-				buf_size = dxgi_manager.get_output_data(&buf);
-			} catch (HRESULT e) {
-				hr = e;
-			}
-		} while (hr == DXGI_ERROR_WAIT_TIMEOUT);
-		if (FAILED(hr)) {
-			printf("get_output_data failed with hr=0x%08x\n", hr);
-			return hr;
-		}
+	uint32_t buf_size;
+	uint8_t* buf;
+	for (uint32_t i = 0; i < 600; i++) {
+		get_frame_bytes(dxgi_manager, &buf_size, &buf);
 		free(buf);
-	//}
-
-	//BYTE* buf;
-	//size_t buf_size;
-	hr = S_OK;
-	do {
-		hr = S_OK;
-		try {
-			buf_size = dxgi_manager.get_output_data(&buf);
-		} catch (HRESULT e) {
-			hr = e;
-		}
-	} while (hr == DXGI_ERROR_WAIT_TIMEOUT);
-	if (FAILED(hr)) {
-		printf("get_output_data failed with hr=0x%08x\n", hr);
-		return hr;
 	}
+
+	delete_dxgi_manager(dxgi_manager);
 	
-	
+	/*
 	printf("Saving capture to capture.bmp\n");
 
 	CComPtr<IWICImagingFactory> spWICFactory;
@@ -119,7 +89,7 @@ int main(int argc, _TCHAR* argv[]) {
 	TRY_RETURN(spFrame->WriteSource(spBitmap, NULL));
 	TRY_RETURN(spFrame->Commit());
 	TRY_RETURN(spEncoder->Commit());
-	
+	*/
 
 	return 0;
 }
