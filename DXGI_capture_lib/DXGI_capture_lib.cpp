@@ -45,7 +45,7 @@ extern "C" {
 }
 
 int main(int argc, _TCHAR* argv[]) {
-	CoInitialize(NULL);
+	init();
 
 	auto dxgi_manager = create_dxgi_manager();
 	// uint32_t width, height;

@@ -4,6 +4,10 @@
 // The first time that `AcquireNextFrame` is called, the resulting frame is very likely to be all
 // black, with no error. Following frames are not though. Why? I don't know. However, since this lib
 // will not just take a single screenshot, but rather stream the screen, this doesn't really matter.
+//
+// There appears to be a huge memory leak (400mb fluxuation every second) somewhere in `get_frame`,
+// `CopyResource` seems to be the culprit, but I can't find anything. Further, this behaviour only
+// occour for one of my monitors, and not at all on my laptop. Might have something to do with AMD GPUs.
 
 #include "DXGIManager.hpp"
 #include <functional>
@@ -59,10 +63,14 @@ DXGI_OUTPUT_DESC DuplicatedOutput::get_desc() {
 
 HRESULT DuplicatedOutput::get_frame(IDXGISurface1** out_surface) {
 	DXGI_OUTDUPL_FRAME_INFO frame_info;
-	CComPtr<IDXGIResource> frame_resource;
+	IDXGIResource* frame_resource;
 	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(500, &frame_info, &frame_resource));
 
-	CComQIPtr<ID3D11Texture2D> frame_texture = frame_resource;
+	ID3D11Texture2D* frame_texture;
+	TRY_RETURN(frame_resource->QueryInterface(__uuidof(ID3D11Texture2D),
+		reinterpret_cast<void **>(&frame_texture)));
+	frame_resource->Release();
+
 	D3D11_TEXTURE2D_DESC texture_desc;
 	frame_texture->GetDesc(&texture_desc);
 
@@ -72,13 +80,17 @@ HRESULT DuplicatedOutput::get_frame(IDXGISurface1** out_surface) {
 	texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 	texture_desc.MiscFlags = 0;
 
-	CComPtr<ID3D11Texture2D> readable_texture;
+	ID3D11Texture2D* readable_texture;
 	TRY_RETURN(m_device->CreateTexture2D(&texture_desc, NULL, &readable_texture));
 	m_device_context->CopyResource(readable_texture, frame_texture);
+	frame_texture->Release();
 
-	CComQIPtr<IDXGISurface1> texture_surface = readable_texture;
+	IDXGISurface1* texture_surface;
+	TRY_RETURN(readable_texture->QueryInterface(__uuidof(IDXGISurface1),
+		reinterpret_cast<void **>(&texture_surface)));
+	readable_texture->Release();
 
-	*out_surface = texture_surface.Detach();
+	*out_surface = texture_surface;
 
 	return S_OK;
 }
@@ -162,7 +174,7 @@ HRESULT DXGIManager::setup() {
 	}
 
 	update();
-
+	
 	return S_OK;
 }
 
@@ -180,18 +192,18 @@ size_t DXGIManager::get_output_data(BYTE** out_buf) {
 	RECT output_rect = output_desc.DesktopCoordinates;
 	uint32_t output_width = output_rect.right - output_rect.left;
 	uint32_t output_height = output_rect.bottom - output_rect.top;
-
 	uint32_t buf_size = output_width * output_height * PIXEL_SIZE;
 
 	BYTE* buf = (BYTE*)malloc(buf_size);
 
-	CComPtr<IDXGISurface1> frame_surface;
+	IDXGISurface1* frame_surface;
+	
 	HRESULT hr = m_output_duplication->get_frame(&frame_surface);
 	if (FAILED(hr)) {
 		m_output_duplication->release_frame();
 		throw hr;
 	}
-
+	
 	DXGI_MAPPED_RECT mapped_surface;
 	TRY_EXCEPT(frame_surface->Map(&mapped_surface, DXGI_MAP_READ));
 
@@ -235,8 +247,9 @@ size_t DXGIManager::get_output_data(BYTE** out_buf) {
 	}
 
 	frame_surface->Unmap();
+	frame_surface->Release();
 	m_output_duplication->release_frame();
-
+	
 	*out_buf = buf;
 	return buf_size;
 }
