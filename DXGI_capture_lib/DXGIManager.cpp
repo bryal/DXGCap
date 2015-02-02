@@ -175,7 +175,7 @@ RECT DXGIManager::get_output_rect() {
 	return output_desc.DesktopCoordinates;
 }
 
-vector<BYTE> DXGIManager::get_output_data() {
+size_t DXGIManager::get_output_data(BYTE** out_buf) {
 	DXGI_OUTPUT_DESC output_desc = m_output_duplication->get_desc();
 	RECT output_rect = output_desc.DesktopCoordinates;
 	uint32_t output_width = output_rect.right - output_rect.left;
@@ -183,9 +183,7 @@ vector<BYTE> DXGIManager::get_output_data() {
 
 	uint32_t buf_size = output_width * output_height * PIXEL_SIZE;
 
-	vector<BYTE> out_buf;
-	// Required since modifying the raw vector.data() does not change size
-	out_buf.resize(buf_size);
+	BYTE* buf = (BYTE*)malloc(buf_size);
 
 	CComPtr<IDXGISurface1> frame_surface;
 	HRESULT hr = m_output_duplication->get_frame(&frame_surface);
@@ -215,17 +213,16 @@ vector<BYTE> DXGIManager::get_output_data() {
 
 	if (output_desc.Rotation == DXGI_MODE_ROTATION_IDENTITY) {
 		// Plain copy by byte
-		BYTE* out_buf_data = out_buf.data();
 		uint32_t out_row_size = output_width * PIXEL_SIZE;
 		for (uint32_t row_n = 0; row_n < output_height; row_n++) {
-			memcpy(out_buf_data + row_n * out_row_size,
+			memcpy(buf + row_n * out_row_size,
 				mapped_surface.pBits + row_n * mapped_surface.Pitch,
 				out_row_size);
 		}
 	} else if (output_desc.Rotation != DXGI_MODE_ROTATION_UNSPECIFIED) {
 		auto& ofsetter = ofsetters[output_desc.Rotation - 2]; // 90deg = 2 -> 0
 		PIXEL* src_pixels = (PIXEL*)mapped_surface.pBits;
-		PIXEL* dest_pixels = (PIXEL*)out_buf.data();
+		PIXEL* dest_pixels = (PIXEL*)buf;
 		for (uint32_t dst_row = 0; dst_row < output_height; dst_row++) {
 			for (uint32_t dst_col = 0; dst_col < output_width; dst_col ++) {
 				*(dest_pixels + dst_row * output_width + dst_col) =
@@ -233,13 +230,15 @@ vector<BYTE> DXGIManager::get_output_data() {
 			}
 		}
 	} else {
+		free(buf);
 		throw -1;
 	}
 
 	frame_surface->Unmap();
 	m_output_duplication->release_frame();
 
-	return out_buf;
+	*out_buf = buf;
+	return buf_size;
 }
 
 DuplicatedOutput* DXGIManager::get_output_duplication() {

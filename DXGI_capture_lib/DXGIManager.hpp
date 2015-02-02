@@ -64,7 +64,7 @@ public:
 	void set_capture_source(UINT16 cs);
 	UINT16 get_capture_source();
 	RECT get_output_rect();
-	vector<BYTE> get_output_data();
+	size_t get_output_data(BYTE** out_buf);
 private:
 	DuplicatedOutput* get_output_duplication();
 

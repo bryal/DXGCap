@@ -24,6 +24,23 @@ extern "C" {
 		*width = dimensions.right - dimensions.left;
 		*height = dimensions.bottom - dimensions.top;
 	}
+
+	bool get_frame_buffer(void* dxgi_manager, uint8_t* o_size, uint8_t** o_bytes) {
+		HRESULT hr;
+		do {
+			hr = S_OK;
+			try {
+
+				*o_size = ((DXGIManager*)dxgi_manager)->get_output_data(o_bytes);
+			} catch (HRESULT e) {
+				hr = e;
+			}
+		} while (hr == DXGI_ERROR_WAIT_TIMEOUT);
+		if (FAILED(hr)) {
+			return false;
+		}
+		return true;
+	}
 }
 
 int main(int argc, _TCHAR* argv[]) {
@@ -38,14 +55,14 @@ int main(int argc, _TCHAR* argv[]) {
 	printf("width=%d height=%d\n", width, height);
 
 	// Benchmark
-	vector<BYTE> buf;
-	for (UINT32 j = 0; j < 2400; j++) {
-		
+	//for (UINT32 j = 0; j < 60; j++) {
+		BYTE* buf;
+		size_t buf_size;
 		HRESULT hr = S_OK;
 		do {
 			hr = S_OK;
 			try {
-				buf = dxgi_manager.get_output_data();
+				buf_size = dxgi_manager.get_output_data(&buf);
 			} catch (HRESULT e) {
 				hr = e;
 			}
@@ -54,6 +71,23 @@ int main(int argc, _TCHAR* argv[]) {
 			printf("get_output_data failed with hr=0x%08x\n", hr);
 			return hr;
 		}
+		free(buf);
+	//}
+
+	//BYTE* buf;
+	//size_t buf_size;
+	hr = S_OK;
+	do {
+		hr = S_OK;
+		try {
+			buf_size = dxgi_manager.get_output_data(&buf);
+		} catch (HRESULT e) {
+			hr = e;
+		}
+	} while (hr == DXGI_ERROR_WAIT_TIMEOUT);
+	if (FAILED(hr)) {
+		printf("get_output_data failed with hr=0x%08x\n", hr);
+		return hr;
 	}
 	
 	
@@ -63,7 +97,7 @@ int main(int argc, _TCHAR* argv[]) {
 	TRY_RETURN(spWICFactory.CoCreateInstance(CLSID_WICImagingFactory));
 
 	CComPtr<IWICBitmap> spBitmap;
-	TRY_RETURN(spWICFactory->CreateBitmapFromMemory(width, height, GUID_WICPixelFormat32bppBGRA, width * 4, buf.size(), (BYTE*)buf.data(), &spBitmap));
+	TRY_RETURN(spWICFactory->CreateBitmapFromMemory(width, height, GUID_WICPixelFormat32bppBGRA, width * 4, buf_size, buf, &spBitmap));
 
 	CComPtr<IWICStream> spStream;
 
