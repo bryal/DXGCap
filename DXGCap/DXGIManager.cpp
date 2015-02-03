@@ -14,6 +14,8 @@
 
 // TODO: add tests!!
 
+// TODO: Add member vars for frame buf and buf size, to avoid malloc for every frame
+
 
 vector<CComPtr<IDXGIOutput>> get_adapter_outputs(IDXGIAdapter1* adapter) {
 	vector<CComPtr<IDXGIOutput>> out_vec;
@@ -109,7 +111,7 @@ bool DuplicatedOutput::is_primary() {
 	return monitor_info.dwFlags & MONITORINFOF_PRIMARY;
 }
 
-DXGIManager::DXGIManager(): m_capture_source(0) {
+DXGIManager::DXGIManager(): m_capture_source(0), m_frame_buf(NULL), m_frame_buf_size(0) {
 	SetRect(&m_output_rect, 0, 0, 0, 0);
 }
 
@@ -180,6 +182,21 @@ HRESULT DXGIManager::setup() {
 
 void DXGIManager::update() {
 	m_output_duplication = get_output_duplication();
+
+	RECT output_rect = get_output_rect();
+	size_t output_width = output_rect.right - output_rect.left;
+	size_t output_height = output_rect.bottom - output_rect.top;
+	size_t buf_size = output_width * output_height * PIXEL_SIZE;
+
+	if (m_frame_buf_size != buf_size) {
+		printf("Updating: %d %d\n", m_frame_buf_size, buf_size);
+		m_frame_buf_size = buf_size;
+		if (m_frame_buf != NULL) {
+			free(m_frame_buf);
+		}
+		printf("Updated: %d\n", m_frame_buf_size);
+		m_frame_buf = (BYTE*)malloc(m_frame_buf_size);
+	}
 }
 
 RECT DXGIManager::get_output_rect() {
@@ -190,14 +207,10 @@ RECT DXGIManager::get_output_rect() {
 size_t DXGIManager::get_output_data(BYTE** out_buf) {
 	DXGI_OUTPUT_DESC output_desc = m_output_duplication->get_desc();
 	RECT output_rect = output_desc.DesktopCoordinates;
-	uint32_t output_width = output_rect.right - output_rect.left;
-	uint32_t output_height = output_rect.bottom - output_rect.top;
-	uint32_t buf_size = output_width * output_height * PIXEL_SIZE;
-
-	BYTE* buf = (BYTE*)malloc(buf_size);
+	size_t output_width = output_rect.right - output_rect.left;
+	size_t output_height = output_rect.bottom - output_rect.top;
 
 	IDXGISurface1* frame_surface;
-	
 	HRESULT hr = m_output_duplication->get_frame(&frame_surface);
 	if (FAILED(hr)) {
 		m_output_duplication->release_frame();
@@ -211,38 +224,37 @@ size_t DXGIManager::get_output_data(BYTE** out_buf) {
 	OffsetRect(&output_rect, -output_rect.left, -output_rect.top);
 
 	// The Pitch may contain padding, wherefore this is not necessarily pixels per row
-	uint32_t map_pitch_n_pixels = mapped_surface.Pitch / PIXEL_SIZE;
+	size_t map_pitch_n_pixels = mapped_surface.Pitch / PIXEL_SIZE;
 
 	// Get address offset for source pixel from destination row and column
 	// Order: 90deg, 180, 270
-	std::function<uint32_t(uint32_t, uint32_t)> ofsetters [] = {
-		// [&](uint32_t row, uint32_t col) { return row * map_pitch_n_pixels + col; },
-		[&](uint32_t row, uint32_t col) { return (output_width-1-col) * map_pitch_n_pixels; },
-		[&](uint32_t row, uint32_t col) {
+	std::function<size_t(size_t, size_t)> ofsetters [] = {
+		// [&](size_t row, size_t col) { return row * map_pitch_n_pixels + col; },
+		[&](size_t row, size_t col) { return (output_width-1-col) * map_pitch_n_pixels; },
+		[&](size_t row, size_t col) {
 			return (output_height-1-row) * map_pitch_n_pixels + (output_width-col-1); },
-		[&](uint32_t row, uint32_t col) {
+		[&](size_t row, size_t col) {
 			return col * map_pitch_n_pixels + (output_height-row-1); }};
 
 	if (output_desc.Rotation == DXGI_MODE_ROTATION_IDENTITY) {
 		// Plain copy by byte
-		uint32_t out_row_size = output_width * PIXEL_SIZE;
-		for (uint32_t row_n = 0; row_n < output_height; row_n++) {
-			memcpy(buf + row_n * out_row_size,
+		size_t out_row_size = output_width * PIXEL_SIZE;
+		for (size_t row_n = 0; row_n < output_height; row_n++) {
+			memcpy(m_frame_buf + row_n * out_row_size,
 				mapped_surface.pBits + row_n * mapped_surface.Pitch,
 				out_row_size);
 		}
 	} else if (output_desc.Rotation != DXGI_MODE_ROTATION_UNSPECIFIED) {
 		auto& ofsetter = ofsetters[output_desc.Rotation - 2]; // 90deg = 2 -> 0
 		PIXEL* src_pixels = (PIXEL*)mapped_surface.pBits;
-		PIXEL* dest_pixels = (PIXEL*)buf;
-		for (uint32_t dst_row = 0; dst_row < output_height; dst_row++) {
-			for (uint32_t dst_col = 0; dst_col < output_width; dst_col ++) {
+		PIXEL* dest_pixels = (PIXEL*)m_frame_buf;
+		for (size_t dst_row = 0; dst_row < output_height; dst_row++) {
+			for (size_t dst_col = 0; dst_col < output_width; dst_col ++) {
 				*(dest_pixels + dst_row * output_width + dst_col) =
 					*(src_pixels + ofsetter(dst_row, dst_col));
 			}
 		}
 	} else {
-		free(buf);
 		throw -1;
 	}
 
@@ -250,8 +262,8 @@ size_t DXGIManager::get_output_data(BYTE** out_buf) {
 	frame_surface->Release();
 	m_output_duplication->release_frame();
 	
-	*out_buf = buf;
-	return buf_size;
+	*out_buf = m_frame_buf;
+	return m_frame_buf_size;
 }
 
 DuplicatedOutput* DXGIManager::get_output_duplication() {
@@ -266,7 +278,7 @@ DuplicatedOutput* DXGIManager::get_output_duplication() {
 		if (out_it->is_primary()) {
 			out_it++;
 		}
-		for (uint32_t i = 1; out_it != m_out_dups.end(); i++, out_it++) {
+		for (size_t i = 1; out_it != m_out_dups.end(); i++, out_it++) {
 			if (i >= m_capture_source && !out_it->is_primary()) {
 				break;
 			}

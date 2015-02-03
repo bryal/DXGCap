@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="DXGI_capture_lib.cpp">
+    <ClCompile Include="DXGIManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DXGIManager.cpp">
+    <ClCompile Include="DXGCap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

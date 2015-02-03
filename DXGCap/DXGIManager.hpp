@@ -72,4 +72,6 @@ private:
 	vector<DuplicatedOutput> m_out_dups;
 	UINT16 m_capture_source;
 	RECT m_output_rect;
+	BYTE* m_frame_buf;
+	size_t m_frame_buf_size;
 };

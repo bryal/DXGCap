@@ -6,32 +6,33 @@
 
 // C ABI
 extern "C" {
-	void init() {
+	__declspec(dllexport) void init() {
 		CoInitialize(NULL);
 	}
 
-	void* create_dxgi_manager() {
+	__declspec(dllexport) void* create_dxgi_manager() {
 		DXGIManager* dxgi_manager = new DXGIManager();
-		dxgi_manager->setup();
+		if (FAILED(dxgi_manager->setup())) {
+			return NULL;
+		}
 		return (void*)dxgi_manager;
 	}
-	void delete_dxgi_manager(void* dxgi_manager) {
+	__declspec(dllexport) void delete_dxgi_manager(void* dxgi_manager) {
 		DXGIManager* m = (DXGIManager*)(dxgi_manager);
 		delete m;
 	}
 
-	void get_output_dimensions(void* dxgi_manager, uint32_t* width, uint32_t* height) {
+	__declspec(dllexport) void get_output_dimensions(void*const dxgi_manager, size_t* width, size_t* height) {
 		RECT dimensions = ((DXGIManager*)dxgi_manager)->get_output_rect();
 		*width = dimensions.right - dimensions.left;
 		*height = dimensions.bottom - dimensions.top;
 	}
 
-	bool get_frame_bytes(void* dxgi_manager, uint32_t* o_size, uint8_t** o_bytes) {
+	__declspec(dllexport) bool get_frame_bytes(void* dxgi_manager, size_t* o_size, uint8_t** o_bytes) {
 		HRESULT hr;
 		do {
 			hr = S_OK;
 			try {
-
 				*o_size = ((DXGIManager*)dxgi_manager)->get_output_data(o_bytes);
 			} catch (HRESULT e) {
 				hr = e;
@@ -44,17 +45,21 @@ extern "C" {
 	}
 }
 
-/*
+
 int main(int argc, _TCHAR* argv[]) {
 	init();
 
 	auto dxgi_manager = create_dxgi_manager();
-	// uint32_t width, height;
-	// get_output_dimensions(dxgi_manager, &width, &height);
+	if (dxgi_manager == NULL) {
+		printf("dxgi_manager is null\n");
+		return -1;
+	}
+	size_t width, height;
+	get_output_dimensions(dxgi_manager, &width, &height);
 
-	uint32_t buf_size;
+	size_t buf_size;
 	uint8_t* buf;
-	for (uint32_t i = 0; i < 600; i++) {
+	for (size_t i = 0; i < 600; i++) {
 		get_frame_bytes(dxgi_manager, &buf_size, &buf);
 		free(buf);
 	}
@@ -95,4 +100,3 @@ int main(int argc, _TCHAR* argv[]) {
 
 	return 0;
 }
-*/
