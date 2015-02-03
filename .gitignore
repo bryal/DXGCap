@@ -196,3 +196,4 @@ FakesAssemblies/
 *.opt
 DXGI_capture_lib/capture.bmp
 DXGI_capture_lib/~AutoRecover.DXGI_capture_lib.vcxproj
+DXGCap/capture.bmp

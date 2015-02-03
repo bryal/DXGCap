@@ -115,7 +115,9 @@ DXGIManager::DXGIManager(): m_capture_source(0), m_frame_buf(NULL), m_frame_buf_
 	SetRect(&m_output_rect, 0, 0, 0, 0);
 }
 
-DXGIManager::~DXGIManager() { }
+DXGIManager::~DXGIManager() {
+	free(m_frame_buf);
+}
 
 void DXGIManager::set_capture_source(UINT16 cs) {
 	m_capture_source = cs;

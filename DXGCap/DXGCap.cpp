@@ -61,7 +61,6 @@ int main(int argc, _TCHAR* argv[]) {
 	uint8_t* buf;
 	for (size_t i = 0; i < 600; i++) {
 		get_frame_bytes(dxgi_manager, &buf_size, &buf);
-		free(buf);
 	}
 
 	get_frame_bytes(dxgi_manager, &buf_size, &buf);
@@ -95,7 +94,6 @@ int main(int argc, _TCHAR* argv[]) {
 	TRY_RETURN(spFrame->Commit());
 	TRY_RETURN(spEncoder->Commit());
 
-	free(buf);
 	delete_dxgi_manager(dxgi_manager);
 
 	return 0;
