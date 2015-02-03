@@ -45,7 +45,7 @@ extern "C" {
 	}
 }
 
-
+// Debugging
 int main(int argc, _TCHAR* argv[]) {
 	init();
 
@@ -56,6 +56,7 @@ int main(int argc, _TCHAR* argv[]) {
 	}
 	size_t width, height;
 	get_output_dimensions(dxgi_manager, &width, &height);
+	printf("%d x %d\n", width, height);
 
 	size_t buf_size;
 	uint8_t* buf;

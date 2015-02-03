@@ -121,7 +121,7 @@ DXGIManager::~DXGIManager() {
 
 void DXGIManager::set_capture_source(UINT16 cs) {
 	m_capture_source = cs;
-	update();
+	update_output();
 }
 UINT16 DXGIManager::get_capture_source() {
 	return m_capture_source;
@@ -177,28 +177,29 @@ HRESULT DXGIManager::setup() {
 		}
 	}
 
-	update();
+	update_output();
 	
 	return S_OK;
 }
 
-void DXGIManager::update() {
+void DXGIManager::update_output() {
 	m_output_duplication = get_output_duplication();
+}
 
+bool DXGIManager::update_buffer_allocation() {
 	RECT output_rect = get_output_rect();
 	size_t output_width = output_rect.right - output_rect.left;
 	size_t output_height = output_rect.bottom - output_rect.top;
 	size_t buf_size = output_width * output_height * PIXEL_SIZE;
-
 	if (m_frame_buf_size != buf_size) {
-		printf("Updating: %d %d\n", m_frame_buf_size, buf_size);
 		m_frame_buf_size = buf_size;
 		if (m_frame_buf != NULL) {
 			free(m_frame_buf);
 		}
-		printf("Updated: %d\n", m_frame_buf_size);
 		m_frame_buf = (BYTE*)malloc(m_frame_buf_size);
+		return true;
 	}
+	return false;
 }
 
 RECT DXGIManager::get_output_rect() {
@@ -211,6 +212,8 @@ size_t DXGIManager::get_output_data(BYTE** out_buf) {
 	RECT output_rect = output_desc.DesktopCoordinates;
 	size_t output_width = output_rect.right - output_rect.left;
 	size_t output_height = output_rect.bottom - output_rect.top;
+
+	bool updated_buf_alloc = update_buffer_allocation();
 
 	IDXGISurface1* frame_surface;
 	HRESULT hr = m_output_duplication->get_frame(&frame_surface);
@@ -265,7 +268,10 @@ size_t DXGIManager::get_output_data(BYTE** out_buf) {
 	m_output_duplication->release_frame();
 	
 	*out_buf = m_frame_buf;
-	return m_frame_buf_size;
+	if (updated_buf_alloc) {
+		return m_frame_buf_size;
+	}
+	return 0;
 }
 
 DuplicatedOutput* DXGIManager::get_output_duplication() {

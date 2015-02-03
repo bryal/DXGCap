@@ -60,7 +60,9 @@ public:
 	DXGIManager();
 	~DXGIManager();
 	HRESULT setup();
-	void update();
+	void update_output();
+	// returns whether allocation was updated
+	bool update_buffer_allocation();
 	void set_capture_source(UINT16 cs);
 	UINT16 get_capture_source();
 	RECT get_output_rect();
