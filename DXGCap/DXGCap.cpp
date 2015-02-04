@@ -6,29 +6,32 @@
 
 // C ABI
 extern "C" {
-	__declspec(dllexport) void init() {
+	__declspec(dllexport)
+	void init() {
 		CoInitialize(NULL);
 	}
 
-	__declspec(dllexport) void* create_dxgi_manager() {
+	__declspec(dllexport)
+	void* create_dxgi_manager() {
 		DXGIManager* dxgi_manager = new DXGIManager();
-		if (FAILED(dxgi_manager->setup())) {
-			return NULL;
-		}
+		dxgi_manager->setup();
 		return (void*)dxgi_manager;
 	}
-	__declspec(dllexport) void delete_dxgi_manager(void* dxgi_manager) {
+	__declspec(dllexport)
+	void delete_dxgi_manager(void* dxgi_manager) {
 		DXGIManager* m = (DXGIManager*)(dxgi_manager);
 		delete m;
 	}
 
-	__declspec(dllexport) void get_output_dimensions(void*const dxgi_manager, size_t* width, size_t* height) {
+	__declspec(dllexport)
+	void get_output_dimensions(void*const dxgi_manager, size_t* width, size_t* height) {
 		RECT dimensions = ((DXGIManager*)dxgi_manager)->get_output_rect();
 		*width = dimensions.right - dimensions.left;
 		*height = dimensions.bottom - dimensions.top;
 	}
 
-	__declspec(dllexport) bool get_frame_bytes(void* dxgi_manager, size_t* o_size, uint8_t** o_bytes) {
+	__declspec(dllexport)
+	long get_frame_bytes(void* dxgi_manager, size_t* o_size, uint8_t** o_bytes) {
 		HRESULT hr;
 		do {
 			hr = S_OK;
@@ -38,10 +41,7 @@ extern "C" {
 				hr = e;
 			}
 		} while (hr == DXGI_ERROR_WAIT_TIMEOUT);
-		if (FAILED(hr)) {
-			return false;
-		}
-		return true;
+		return hr;
 	}
 }
 
@@ -59,9 +59,16 @@ int main(int argc, _TCHAR* argv[]) {
 	printf("%d x %d\n", width, height);
 
 	size_t buf_size;
-	uint8_t* buf;
-	for (size_t i = 0; i < 600; i++) {
-		get_frame_bytes(dxgi_manager, &buf_size, &buf);
+	uint8_t* buf = NULL;
+	for (size_t i = 0; i < 60000; i++) {
+		HRESULT hr = get_frame_bytes(dxgi_manager, &buf_size, &buf);
+		if (FAILED(hr)) {
+			printf("`get_frame_bytes` failed with 0x%x\n", hr);
+			if (hr == DXGI_ERROR_ACCESS_LOST) {
+				printf("Access lost\n");
+				return hr;
+			}
+		}
 	}
 
 	get_frame_bytes(dxgi_manager, &buf_size, &buf);
