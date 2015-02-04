@@ -34,11 +34,11 @@ vector<CComPtr<IDXGIOutput>> get_adapter_outputs(IDXGIAdapter1* adapter) {
 			out_vec.push_back(output);
 		}
 
-		printf("Display output found. Device:%ls Rotation:%d Coordinates:(%d,%d) (%d,%d)\n",
-			out_desc.DeviceName,
-			out_desc.Rotation,
-			out_desc.DesktopCoordinates.left, out_desc.DesktopCoordinates.top,
-			out_desc.DesktopCoordinates.right, out_desc.DesktopCoordinates.bottom);
+		// printf("Display output found. Device:%ls Rotation:%d Coordinates:(%d,%d) (%d,%d)\n",
+		// 	out_desc.DeviceName,
+		// 	out_desc.Rotation,
+		// 	out_desc.DesktopCoordinates.left, out_desc.DesktopCoordinates.top,
+		// 	out_desc.DesktopCoordinates.right, out_desc.DesktopCoordinates.bottom);
 	}
 
 	return out_vec;
@@ -146,14 +146,12 @@ void DXGIManager::gather_output_duplications() {
 		adapters.push_back(n_adapter);
 		n_adapter.Release();
 	}
-	printf("n_adapters: %d\n", adapters.size());
 	// Iterating over all adapters to get all outputs
 	for (auto& adapter : adapters) {
 		vector<CComPtr<IDXGIOutput>> outputs = get_adapter_outputs(adapter);
 		if (outputs.size() == 0) {
 			continue;
 		}
-		printf("n_outputs: %d\n", outputs.size());
 
 		// Creating device for each adapter that has the output
 		CComPtr<ID3D11Device> d3d11_device;
@@ -172,7 +170,6 @@ void DXGIManager::gather_output_duplications() {
 			CComPtr<IDXGIOutputDuplication> duplicated_output;
 			HRESULT hr = output->DuplicateOutput(dxgi_device, &duplicated_output);
 			if (FAILED(hr)) {
-				printf("Duplication failed: 0x%x\n", hr);
 				continue;
 			}
 
@@ -185,21 +182,32 @@ void DXGIManager::gather_output_duplications() {
 	}
 }
 
+// Will try to update the managers m_output_duplication.
 void DXGIManager::update_output() {
-	// Will retry getting specified output. Will exit after too many failed tries (0.8s/try).
+	// Will retry getting specified output. Will go idle after too many tries. There is likely
+	// a fullscreen app with restricted access giving us E_ACCESSDENIED
 	for (uint8_t i = 0; i < UPDATE_ALLOWED_TRIES; i++) {
 		gather_output_duplications();
-		printf("os: %d\n", m_out_dups.size());
 		m_output_duplication = get_output_duplication();
 		if (m_output_duplication == NULL) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		} else {
+			printf("Updated output\n");
 			return;
 		}
 	}
-	printf("Failed to get output after %d tries. Giving up.\n"
-		"Make sure youre monitors are plugged in and available\n", UPDATE_ALLOWED_TRIES);
-	std::exit(-1);
+	for (uint64_t i = 0; ; i++) {
+		gather_output_duplications();
+		m_output_duplication = get_output_duplication();
+		if (m_output_duplication == NULL) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+			printf("Zzzz"); for (uint8_t j = 0; j < i%5; j++) { printf("."); }
+			printf("\n");
+		} else {
+			printf("Updated output\n");
+			return;
+		}
+	}
 }
 
 bool DXGIManager::update_buffer_allocation() {
