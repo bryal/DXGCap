@@ -1,3 +1,25 @@
+// The MIT License (MIT)
+//
+// Copyright (c) 2015 Johan Johansson
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 // DXGI_capture_lib.cpp : The entry point for the application.
 //
 // NOTES:
@@ -17,6 +39,11 @@
 // TODO: add tests!!
 
 // TODO: Add member vars for frame buf and buf size, to avoid malloc for every frame
+
+// The default format of B8G8R8A8 gives a pixel-size of 4 bytes
+#define PIXEL_SIZE 4
+#define PIXEL uint32_t
+#define REFRESH_MAX_TRIES 10
 
 
 vector<CComPtr<IDXGIOutput>> get_adapter_outputs(IDXGIAdapter1* adapter) {
@@ -86,7 +113,7 @@ HRESULT DuplicatedOutput::get_frame(IDXGISurface1** out_surface) {
 	texture_desc.MiscFlags = 0;
 
 	ID3D11Texture2D* readable_texture;
-	TRY_PANIC(m_device->CreateTexture2D(&texture_desc, NULL, &readable_texture));
+	TRY_RETURN(m_device->CreateTexture2D(&texture_desc, NULL, &readable_texture));
 	m_device_context->CopyResource(readable_texture, frame_texture);
 	frame_texture->Release();
 
@@ -123,14 +150,14 @@ DXGIManager::~DXGIManager() {
 
 void DXGIManager::set_capture_source(UINT16 cs) {
 	m_capture_source = cs;
-	update_output();
+	refresh_output();
 }
 UINT16 DXGIManager::get_capture_source() {
 	return m_capture_source;
 }
 
 void DXGIManager::setup() {
-	update_output();
+	refresh_output();
 }
 
 void DXGIManager::gather_output_duplications() {
@@ -182,34 +209,25 @@ void DXGIManager::gather_output_duplications() {
 	}
 }
 
-// Will try to update the managers m_output_duplication.
-void DXGIManager::update_output() {
-	// Will retry getting specified output. Will go idle after too many tries. There is likely
+// Update all output duplications in manager and refresh the capture source, m_output_duplication.
+// Returns whether succeded refreshing.
+bool DXGIManager::refresh_output() {
+	// Will retry getting specified output. Will fail after too many tries. There is likely
 	// a fullscreen app with restricted access giving us E_ACCESSDENIED
-	for (uint8_t i = 0; i < UPDATE_ALLOWED_TRIES; i++) {
+	for (uint8_t i = 0; i < REFRESH_MAX_TRIES; i++) {
 		gather_output_duplications();
 		m_output_duplication = get_output_duplication();
 		if (m_output_duplication == NULL) {
-			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			std::this_thread::sleep_for(std::chrono::milliseconds(700));
 		} else {
-			printf("Updated output\n");
-			return;
+			printf("Refreshed output\n");
+			return true;
 		}
 	}
-	for (uint64_t i = 0; ; i++) {
-		gather_output_duplications();
-		m_output_duplication = get_output_duplication();
-		if (m_output_duplication == NULL) {
-			std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-			printf("Zzzz"); for (uint8_t j = 0; j < i%5; j++) { printf("."); }
-			printf("\n");
-		} else {
-			printf("Updated output\n");
-			return;
-		}
-	}
+	return false;
 }
 
+// Returns whether new allocation was made
 bool DXGIManager::update_buffer_allocation() {
 	RECT output_rect = get_output_rect();
 	size_t output_width = output_rect.right - output_rect.left;
@@ -231,33 +249,37 @@ RECT DXGIManager::get_output_rect() {
 	return output_desc.DesktopCoordinates;
 }
 
-// TODO: change to return HRESULT instead of throw esception, matches better with rest of the code
-size_t DXGIManager::get_output_data(BYTE** out_buf) {
+CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size) {
+	update_buffer_allocation();
+
+	IDXGISurface1* frame_surface;
+	HRESULT hr = m_output_duplication->get_frame(&frame_surface);
+	if (hr == DXGI_ERROR_ACCESS_LOST) {
+		// Access lost, refresh the output so the next call won't fail
+		refresh_output();
+		return CR_ACCESS_LOST;
+	} else if (hr == E_ACCESSDENIED) {
+		m_output_duplication->release_frame();
+		return CR_ACCESS_DENIED;
+	} else if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
+		return CR_TIMEOUT;
+	} else if (FAILED(hr)) {
+		m_output_duplication->release_frame();
+		return CR_FAIL;
+	}
+	
+	DXGI_MAPPED_RECT mapped_surface;
+	hr = frame_surface->Map(&mapped_surface, DXGI_MAP_READ);
+	if (FAILED(hr)) {
+		frame_surface->Release();
+		m_output_duplication->release_frame();
+		return CR_FAIL;
+	}
+
 	DXGI_OUTPUT_DESC output_desc = m_output_duplication->get_desc();
 	RECT output_rect = output_desc.DesktopCoordinates;
 	size_t output_width = output_rect.right - output_rect.left;
 	size_t output_height = output_rect.bottom - output_rect.top;
-
-	update_buffer_allocation();
-
-	IDXGISurface1* frame_surface;
-	while (true) {
-		HRESULT hr = m_output_duplication->get_frame(&frame_surface);
-		if (hr == DXGI_ERROR_ACCESS_LOST) {
-			// Access lost, get new DuplicatedOutput before trying again
-			printf("Access lost\n");
-			update_output();
-		} else if (FAILED(hr)) {
-			m_output_duplication->release_frame();
-			throw hr;
-		} else {
-			break;
-		}
-	}
-	
-	DXGI_MAPPED_RECT mapped_surface;
-	TRY_EXCEPT(frame_surface->Map(&mapped_surface, DXGI_MAP_READ));
-
 	// Set origin of `output_rect` to (0, 0)
 	OffsetRect(&output_rect, -output_rect.left, -output_rect.top);
 
@@ -274,7 +296,9 @@ size_t DXGIManager::get_output_data(BYTE** out_buf) {
 		[&](size_t row, size_t col) {
 			return col * map_pitch_n_pixels + (output_height-row-1); }};
 
-	if (output_desc.Rotation == DXGI_MODE_ROTATION_IDENTITY) {
+	if (output_desc.Rotation == DXGI_MODE_ROTATION_IDENTITY ||
+		output_desc.Rotation == DXGI_MODE_ROTATION_UNSPECIFIED) // Assume no rotation
+	{
 		// Plain copy by byte
 		size_t out_row_size = output_width * PIXEL_SIZE;
 		for (size_t row_n = 0; row_n < output_height; row_n++) {
@@ -292,8 +316,6 @@ size_t DXGIManager::get_output_data(BYTE** out_buf) {
 					*(src_pixels + ofsetter(dst_row, dst_col));
 			}
 		}
-	} else {
-		throw -1;
 	}
 
 	frame_surface->Unmap();
@@ -301,7 +323,8 @@ size_t DXGIManager::get_output_data(BYTE** out_buf) {
 	m_output_duplication->release_frame();
 	
 	*out_buf = m_frame_buf;
-	return m_frame_buf_size;
+	*out_buf_size = m_frame_buf_size;
+	return CR_OK;
 }
 
 void DXGIManager::clear_output_duplications() {

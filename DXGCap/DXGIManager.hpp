@@ -1,3 +1,25 @@
+// The MIT License (MIT)
+//
+// Copyright (c) 2015 Johan Johansson
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 #pragma once
 
 #include <Windows.h>
@@ -11,11 +33,6 @@
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d11.lib")
-
-// The default format of B8G8R8A8 gives a pixel-size of 4 bytes
-#define PIXEL_SIZE 4
-#define PIXEL uint32_t
-#define UPDATE_ALLOWED_TRIES 20
 
 // printf(#expr " failed with error: %x\n", e); use for debugging
 // Try performing the expression with return type HRESULT. If the result is a failure, return it.
@@ -42,6 +59,18 @@
 }
 
 using std::vector;
+
+enum CaptureResult {
+	CR_OK = 0,
+	// Could not duplicate output, access denied. Might be in protected fullscreen.
+	CR_ACCESS_DENIED,
+	// Access to the duplicated output was lost. Likely, mode was changed
+	CR_ACCESS_LOST,
+	// AcquireNextFrame timed out.
+	CR_TIMEOUT,
+	// General/Unexpected failure
+	CR_FAIL,
+};
 
 
 vector<CComPtr<IDXGIOutput>> get_adapter_outputs(IDXGIAdapter1* adapter);
@@ -73,11 +102,11 @@ public:
 	void set_capture_source(UINT16 cs);
 	UINT16 get_capture_source();
 	RECT get_output_rect();
-	size_t get_output_data(BYTE** out_buf);
+	CaptureResult get_output_data(BYTE** out_buf, size_t* out_buf_size);
 private:
 	// returns whether allocation was updated
 	bool update_buffer_allocation();
-	void update_output();
+	bool refresh_output();
 	void gather_output_duplications();
 	DuplicatedOutput* get_output_duplication();
 	void clear_output_duplications();

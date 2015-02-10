@@ -1,3 +1,25 @@
+// The MIT License (MIT)
+//
+// Copyright (c) 2015 Johan Johansson
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 // DXGICaptureSample.cpp : Defines the entry point for the console application.
 //
 
@@ -30,18 +52,10 @@ extern "C" {
 		*height = dimensions.bottom - dimensions.top;
 	}
 
+	// Return the CaptureResult of acquiring frame and its data
 	__declspec(dllexport)
-	long get_frame_bytes(void* dxgi_manager, size_t* o_size, uint8_t** o_bytes) {
-		HRESULT hr;
-		do {
-			hr = S_OK;
-			try {
-				*o_size = ((DXGIManager*)dxgi_manager)->get_output_data(o_bytes);
-			} catch (HRESULT e) {
-				hr = e;
-			}
-		} while (hr == DXGI_ERROR_WAIT_TIMEOUT);
-		return hr;
+	uint8_t get_frame_bytes(void* dxgi_manager, size_t* o_size, uint8_t** o_bytes) {
+		return ((DXGIManager*)dxgi_manager)->get_output_data(o_bytes, o_size);
 	}
 }
 
@@ -52,7 +66,7 @@ int main(int argc, _TCHAR* argv[]) {
 	auto dxgi_manager = create_dxgi_manager();
 	if (dxgi_manager == NULL) {
 		printf("dxgi_manager is null\n");
-		return -1;
+		return 1;
 	}
 	size_t width, height;
 	get_output_dimensions(dxgi_manager, &width, &height);
@@ -61,13 +75,21 @@ int main(int argc, _TCHAR* argv[]) {
 	size_t buf_size;
 	uint8_t* buf = NULL;
 	for (size_t i = 0; i < 60000; i++) {
-		HRESULT hr = get_frame_bytes(dxgi_manager, &buf_size, &buf);
-		if (FAILED(hr)) {
-			printf("`get_frame_bytes` failed with 0x%x\n", hr);
-			if (hr == DXGI_ERROR_ACCESS_LOST) {
+		switch (get_frame_bytes(dxgi_manager, &buf_size, &buf)) {
+			case CR_OK:
+				break;
+			case CR_ACCESS_DENIED:
+				printf("Access denied\n");
+				break;
+			case CR_ACCESS_LOST:
 				printf("Access lost\n");
-				return hr;
-			}
+				break;
+			case CR_TIMEOUT:
+				printf("Timeout\n");
+				break;
+			case CR_FAIL:
+				printf("General failure\n");
+				break;
 		}
 	}
 
