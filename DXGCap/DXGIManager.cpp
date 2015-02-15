@@ -252,6 +252,8 @@ RECT DXGIManager::get_output_rect() {
 CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size) {
 	update_buffer_allocation();
 
+	m_output_duplication->release_frame();
+
 	IDXGISurface1* frame_surface;
 	HRESULT hr = m_output_duplication->get_frame(&frame_surface);
 	if (hr == DXGI_ERROR_ACCESS_LOST) {
@@ -259,12 +261,14 @@ CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size)
 		refresh_output();
 		return CR_ACCESS_LOST;
 	} else if (hr == E_ACCESSDENIED) {
-		m_output_duplication->release_frame();
 		return CR_ACCESS_DENIED;
 	} else if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
 		return CR_TIMEOUT;
 	} else if (FAILED(hr)) {
-		m_output_duplication->release_frame();
+		// Sometimes when modes are changed or something, AcquireNextFrame complains about
+		// DXGI_ERROR_INVALID_CALL, the previous frame was not released. This is not the
+		// case though, and to accomodate for the change in modes we refresh outputs.
+		refresh_output();
 		return CR_FAIL;
 	}
 	
@@ -272,7 +276,6 @@ CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size)
 	hr = frame_surface->Map(&mapped_surface, DXGI_MAP_READ);
 	if (FAILED(hr)) {
 		frame_surface->Release();
-		m_output_duplication->release_frame();
 		return CR_FAIL;
 	}
 
@@ -320,7 +323,6 @@ CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size)
 
 	frame_surface->Unmap();
 	frame_surface->Release();
-	m_output_duplication->release_frame();
 	
 	*out_buf = m_frame_buf;
 	*out_buf_size = m_frame_buf_size;
