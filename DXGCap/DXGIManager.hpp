@@ -20,8 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#pragma once
-
 #include <Windows.h>
 #include <atlbase.h>
 #include <DXGI1_2.h>
@@ -83,7 +81,7 @@ public:
 		IDXGIOutputDuplication* output_dup);
 	~DuplicatedOutput();
 	DXGI_OUTPUT_DESC get_desc();
-	HRESULT get_frame(IDXGISurface1** out_surface);
+	HRESULT get_frame(IDXGISurface1** out_surface, uint32_t timeout);
 	void release_frame();
 	bool is_primary();
 
@@ -101,6 +99,7 @@ public:
 	void setup();
 	void set_capture_source(UINT16 cs);
 	UINT16 get_capture_source();
+	void set_timeout(uint32_t timeout);
 	RECT get_output_rect();
 	CaptureResult get_output_data(BYTE** out_buf, size_t* out_buf_size);
 private:
@@ -117,4 +116,5 @@ private:
 	RECT m_output_rect;
 	BYTE* m_frame_buf;
 	size_t m_frame_buf_size;
+	uint32_t m_timeout;
 };

@@ -46,6 +46,11 @@ extern "C" {
 	}
 
 	__declspec(dllexport)
+	void set_timeout(void* dxgi_manager, uint32_t timeout) {
+		((DXGIManager*)dxgi_manager)->set_timeout(timeout);
+	}
+
+	__declspec(dllexport)
 	void get_output_dimensions(void*const dxgi_manager, size_t* width, size_t* height) {
 		RECT dimensions = ((DXGIManager*)dxgi_manager)->get_output_rect();
 		*width = dimensions.right - dimensions.left;

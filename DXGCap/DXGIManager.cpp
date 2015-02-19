@@ -60,12 +60,6 @@ vector<CComPtr<IDXGIOutput>> get_adapter_outputs(IDXGIAdapter1* adapter) {
 		if (out_desc.AttachedToDesktop) {
 			out_vec.push_back(output);
 		}
-
-		// printf("Display output found. Device:%ls Rotation:%d Coordinates:(%d,%d) (%d,%d)\n",
-		// 	out_desc.DeviceName,
-		// 	out_desc.Rotation,
-		// 	out_desc.DesktopCoordinates.left, out_desc.DesktopCoordinates.top,
-		// 	out_desc.DesktopCoordinates.right, out_desc.DesktopCoordinates.bottom);
 	}
 
 	return out_vec;
@@ -93,10 +87,10 @@ DXGI_OUTPUT_DESC DuplicatedOutput::get_desc() {
 }
 
 // Returns status of AcquireNextFrame. May well be DXGI_ERROR_ACCESS_LOST due to mode change.
-HRESULT DuplicatedOutput::get_frame(IDXGISurface1** out_surface) {
+HRESULT DuplicatedOutput::get_frame(IDXGISurface1** out_surface, uint32_t timeout) {
 	IDXGIResource* frame_resource;
 	DXGI_OUTDUPL_FRAME_INFO frame_info;
-	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(500, &frame_info, &frame_resource));
+	TRY_RETURN(m_dxgi_output_dup->AcquireNextFrame(timeout, &frame_info, &frame_resource));
 
 	ID3D11Texture2D* frame_texture;
 	frame_resource->QueryInterface(__uuidof(ID3D11Texture2D),
@@ -140,7 +134,11 @@ bool DuplicatedOutput::is_primary() {
 	return monitor_info.dwFlags & MONITORINFOF_PRIMARY;
 }
 
-DXGIManager::DXGIManager(): m_capture_source(0), m_frame_buf(NULL), m_frame_buf_size(0) {
+DXGIManager::DXGIManager(): m_capture_source(0),
+	m_frame_buf(NULL),
+	m_frame_buf_size(0),
+	m_timeout(100)
+{
 	SetRect(&m_output_rect, 0, 0, 0, 0);
 }
 
@@ -154,6 +152,10 @@ void DXGIManager::set_capture_source(UINT16 cs) {
 }
 UINT16 DXGIManager::get_capture_source() {
 	return m_capture_source;
+}
+
+void DXGIManager::set_timeout(uint32_t timeout) {
+	m_timeout = timeout;
 }
 
 void DXGIManager::setup() {
@@ -220,7 +222,6 @@ bool DXGIManager::refresh_output() {
 		if (m_output_duplication == NULL) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(700));
 		} else {
-			printf("Refreshed output\n");
 			return true;
 		}
 	}
@@ -255,7 +256,7 @@ CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size)
 	m_output_duplication->release_frame();
 
 	IDXGISurface1* frame_surface;
-	HRESULT hr = m_output_duplication->get_frame(&frame_surface);
+	HRESULT hr = m_output_duplication->get_frame(&frame_surface, m_timeout);
 	if (hr == DXGI_ERROR_ACCESS_LOST) {
 		// Access lost, refresh the output so the next call won't fail
 		refresh_output();
