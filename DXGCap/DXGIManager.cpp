@@ -108,6 +108,11 @@ HRESULT DuplicatedOutput::get_frame(IDXGISurface1** out_surface, uint32_t timeou
 
 	ID3D11Texture2D* readable_texture;
 	TRY_RETURN(m_device->CreateTexture2D(&texture_desc, NULL, &readable_texture));
+
+	// Lower priorities causes stuff to be needlessly copied from gpu to ram, causing huge
+	// fluxuations on some systems.
+	readable_texture->SetEvictionPriority(DXGI_RESOURCE_PRIORITY_MAXIMUM);
+
 	m_device_context->CopyResource(readable_texture, frame_texture);
 	frame_texture->Release();
 
@@ -115,6 +120,8 @@ HRESULT DuplicatedOutput::get_frame(IDXGISurface1** out_surface, uint32_t timeou
 	readable_texture->QueryInterface(__uuidof(IDXGISurface1),
 		reinterpret_cast<void **>(&texture_surface));
 	readable_texture->Release();
+
+	m_dxgi_output_dup->ReleaseFrame();
 
 	*out_surface = texture_surface;
 	return S_OK;
@@ -252,8 +259,6 @@ RECT DXGIManager::get_output_rect() {
 
 CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size) {
 	update_buffer_allocation();
-
-	m_output_duplication->release_frame();
 
 	IDXGISurface1* frame_surface;
 	HRESULT hr = m_output_duplication->get_frame(&frame_surface, m_timeout);

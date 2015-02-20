@@ -30,7 +30,12 @@
 extern "C" {
 	__declspec(dllexport)
 	void init() {
-		CoInitialize(NULL);
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	}
+
+	__declspec(dllexport)
+	void uninit() {
+		CoUninitialize();
 	}
 
 	__declspec(dllexport)
