@@ -153,11 +153,11 @@ DXGIManager::~DXGIManager() {
 	free(m_frame_buf);
 }
 
-void DXGIManager::set_capture_source(UINT16 cs) {
+void DXGIManager::set_capture_source(uint16_t cs) {
 	m_capture_source = cs;
 	refresh_output();
 }
-UINT16 DXGIManager::get_capture_source() {
+uint16_t DXGIManager::get_capture_source() {
 	return m_capture_source;
 }
 

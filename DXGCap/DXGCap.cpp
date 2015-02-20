@@ -56,6 +56,16 @@ extern "C" {
 	}
 
 	__declspec(dllexport)
+	void set_capture_source(void* dxgi_manager, uint16_t cs) {
+		((DXGIManager*)dxgi_manager)->set_capture_source(cs);
+	}
+
+	__declspec(dllexport)
+	uint16_t get_capture_source(void* dxgi_manager) {
+		return ((DXGIManager*)dxgi_manager)->get_capture_source();
+	}
+
+	__declspec(dllexport)
 	void get_output_dimensions(void*const dxgi_manager, size_t* width, size_t* height) {
 		RECT dimensions = ((DXGIManager*)dxgi_manager)->get_output_rect();
 		*width = dimensions.right - dimensions.left;
