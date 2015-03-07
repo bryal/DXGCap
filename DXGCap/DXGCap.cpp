@@ -66,7 +66,7 @@ extern "C" {
 	}
 
 	__declspec(dllexport)
-	void get_output_dimensions(void*const dxgi_manager, size_t* width, size_t* height) {
+	void get_output_dimensions(void*const dxgi_manager, uint32_t* width, uint32_t* height) {
 		RECT dimensions = ((DXGIManager*)dxgi_manager)->get_output_rect();
 		*width = dimensions.right - dimensions.left;
 		*height = dimensions.bottom - dimensions.top;
@@ -88,7 +88,7 @@ int main(int argc, _TCHAR* argv[]) {
 		printf("dxgi_manager is null\n");
 		return 1;
 	}
-	size_t width, height;
+	uint32_t width, height;
 	get_output_dimensions(dxgi_manager, &width, &height);
 	printf("%d x %d\n", width, height);
 
