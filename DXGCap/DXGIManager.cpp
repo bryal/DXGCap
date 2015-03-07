@@ -264,6 +264,7 @@ CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size)
 	HRESULT hr = m_output_duplication->get_frame(&frame_surface, m_timeout);
 	if (hr == DXGI_ERROR_ACCESS_LOST) {
 		// Access lost, refresh the output so the next call won't fail
+		// TODO: handle refresh failure
 		refresh_output();
 		return CR_ACCESS_LOST;
 	} else if (hr == E_ACCESSDENIED) {
@@ -346,25 +347,13 @@ DuplicatedOutput* DXGIManager::get_output_duplication() {
 	if (n_out_dups == 0) {
 		return NULL;
 	}
-	size_t i = 0;
-	if (m_capture_source == 0) { // Find the primary output
-		for (; i < n_out_dups; i++) {
+	if (m_capture_source == 0 || n_out_dups < m_capture_source) { // Find the primary output
+		for (size_t i = 0; i < n_out_dups; i++) {
 			if (m_out_dups[i].is_primary()) {
-				break;
+				return &m_out_dups[i];
 			}
 		}
-	} else { // Find the m_capture_source:th, non-primary output
-		if (m_out_dups[i].is_primary()) {
-			i++;
-		}
-		for (size_t j = 1; i < n_out_dups; j++, i++) {
-			if (j >= m_capture_source && !m_out_dups[i].is_primary()) {
-				break;
-			}
-		}
+	} else {
+		return &m_out_dups[m_capture_source - 1];
 	}
-	if (i >= n_out_dups) {
-		return NULL;
-	}
-	return &m_out_dups[i];
 }
