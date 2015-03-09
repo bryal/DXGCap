@@ -26,10 +26,6 @@
 // The first time that `AcquireNextFrame` is called, the resulting frame is very likely to be all
 // black, with no error. Following frames are not though. Why? I don't know. However, since this lib
 // will not just take a single screenshot, but rather stream the screen, this doesn't really matter.
-//
-// There appears to be a huge memory leak (400mb fluxuation every second) somewhere in `get_frame`,
-// `CopyResource` seems to be the culprit, but I can't find anything. Further, this behaviour only
-// occour for one of my monitors, and not at all on my laptop. Might have something to do with AMD GPUs.
 
 #include "DXGIManager.hpp"
 #include <functional>
@@ -43,7 +39,7 @@
 // The default format of B8G8R8A8 gives a pixel-size of 4 bytes
 #define PIXEL_SIZE 4
 #define PIXEL uint32_t
-#define REFRESH_MAX_TRIES 10
+#define REFRESH_MAX_TRIES 4
 
 
 vector<CComPtr<IDXGIOutput>> get_adapter_outputs(IDXGIAdapter1* adapter) {
@@ -227,7 +223,7 @@ bool DXGIManager::refresh_output() {
 		gather_output_duplications();
 		m_output_duplication = get_output_duplication();
 		if (m_output_duplication == NULL) {
-			std::this_thread::sleep_for(std::chrono::milliseconds(700));
+			std::this_thread::sleep_for(std::chrono::milliseconds(400));
 		} else {
 			return true;
 		}
@@ -258,14 +254,15 @@ RECT DXGIManager::get_output_rect() {
 }
 
 CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size) {
-	update_buffer_allocation();
-
 	IDXGISurface1* frame_surface;
 	HRESULT hr = m_output_duplication->get_frame(&frame_surface, m_timeout);
+
 	if (hr == DXGI_ERROR_ACCESS_LOST) {
 		// Access lost, refresh the output so the next call won't fail
 		// TODO: handle refresh failure
-		refresh_output();
+		if (!refresh_output()) {
+			return CR_REFRESH_FAILURE;
+		}
 		return CR_ACCESS_LOST;
 	} else if (hr == E_ACCESSDENIED) {
 		return CR_ACCESS_DENIED;
@@ -295,6 +292,8 @@ CaptureResult DXGIManager::get_output_data(BYTE** out_buf, size_t* out_buf_size)
 
 	// The Pitch may contain padding, wherefore this is not necessarily pixels per row
 	size_t map_pitch_n_pixels = mapped_surface.Pitch / PIXEL_SIZE;
+
+	update_buffer_allocation();
 
 	// Get address offset for source pixel from destination row and column
 	// Order: 90deg, 180, 270
@@ -344,16 +343,16 @@ void DXGIManager::clear_output_duplications() {
 // If there are no output duplications, or specified monitor is not found, return NULL
 DuplicatedOutput* DXGIManager::get_output_duplication() {
 	size_t n_out_dups = m_out_dups.size();
-	if (n_out_dups == 0) {
-		return NULL;
-	}
-	if (m_capture_source == 0 || n_out_dups < m_capture_source) { // Find the primary output
-		for (size_t i = 0; i < n_out_dups; i++) {
-			if (m_out_dups[i].is_primary()) {
-				return &m_out_dups[i];
+	if (n_out_dups != 0) {
+		if (m_capture_source == 0 || n_out_dups < m_capture_source) { // Find the primary output
+			for (size_t i = 0; i < n_out_dups; i++) {
+				if (m_out_dups[i].is_primary()) {
+					return &m_out_dups[i];
+				}
 			}
+		} else {
+			return &m_out_dups[m_capture_source - 1];
 		}
-	} else {
-		return &m_out_dups[m_capture_source - 1];
 	}
+	return NULL;
 }

@@ -64,6 +64,8 @@ enum CaptureResult {
 	CR_ACCESS_DENIED,
 	// Access to the duplicated output was lost. Likely, mode was changed
 	CR_ACCESS_LOST,
+	// Error when trying to refresh outputs after failure.
+	CR_REFRESH_FAILURE,
 	// AcquireNextFrame timed out.
 	CR_TIMEOUT,
 	// General/Unexpected failure
@@ -84,7 +86,6 @@ public:
 	HRESULT get_frame(IDXGISurface1** out_surface, uint32_t timeout);
 	void release_frame();
 	bool is_primary();
-
 private:
 	CComPtr<ID3D11Device> m_device;
 	CComPtr<ID3D11DeviceContext> m_device_context;
@@ -101,11 +102,11 @@ public:
 	UINT16 get_capture_source();
 	void set_timeout(uint32_t timeout);
 	RECT get_output_rect();
+	bool refresh_output();
 	CaptureResult get_output_data(BYTE** out_buf, size_t* out_buf_size);
 private:
 	// returns whether allocation was updated
 	bool update_buffer_allocation();
-	bool refresh_output();
 	void gather_output_duplications();
 	DuplicatedOutput* get_output_duplication();
 	void clear_output_duplications();
